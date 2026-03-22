@@ -14,18 +14,9 @@ export function Navbar() {
         <span className="text-xl font-bold tracking-tight text-zinc-900">Flux</span>
       </Link>
 
-      <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-500">
-        <Link href="#features" className="hover:text-zinc-900 transition-colors">Features</Link>
-        <Link href="#modes" className="hover:text-zinc-900 transition-colors">Study Modes</Link>
-        <Link href="#pricing" className="hover:text-zinc-900 transition-colors">Pricing</Link>
-      </div>
-
       <div className="flex items-center gap-4">
-        <Link href="/dashboard" className="text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors">
-          Log in
-        </Link>
-        <Link href="/dashboard" className={buttonVariants({ variant: "default", className: "bg-zinc-900 text-white hover:bg-zinc-800 rounded-full px-6 font-medium shadow-sm" })}>
-          Get Started
+        <Link href="/dashboard" className={buttonVariants({ variant: "default", className: "text-black hover:bg-zinc-800 rounded-full px-6 font-medium shadow-sm" })}>
+          My Study Guides
         </Link>
       </div>
     </nav>

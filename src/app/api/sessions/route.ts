@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { mockSessions } from "@/lib/mockData";
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 export async function GET() {
   try {
@@ -58,7 +59,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { title, files } = body; // Simplified
+    const { title, files, activeModes } = body;
 
     const newSession = await prisma.session.create({
       data: {
@@ -70,6 +71,7 @@ export async function POST(request: Request) {
         audioCount: files?.audio || 0,
         videoCount: files?.video || 0,
         imageCount: files?.image || 0,
+        activeModes: activeModes && Array.isArray(activeModes) ? activeModes.join(',') : "notes",
       },
     });
 

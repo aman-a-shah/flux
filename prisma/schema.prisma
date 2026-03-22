@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -27,6 +28,15 @@ model Session {
   audioCount  Int      @default(0)
   videoCount  Int      @default(0)
   imageCount  Int      @default(0)
+
+  // generation outputs
+  notes       String?   // Markdown string
+  flashcards  String?   // JSON Array [{front, back}]
+  quiz        String?   // JSON Array [{question, options, answer_index, explanation}]
+  quest       String?   // JSON State for text-adventure
+  podcast     String?   // Base64 audio string or ElevenLabs output
+  visual      String?   // Mermaid DSL or JSON for visual graph
+  activeModes String?   // Comma separated list of active study modes
 
   userId      String?
   user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)

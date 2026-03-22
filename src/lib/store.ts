@@ -14,6 +14,13 @@ export interface Session {
     video: number;
     image: number;
   };
+  activeModes?: string[];
+  notes?: string | null;
+  flashcards?: any[] | null;
+  quiz?: any[] | null;
+  quest?: any | null;
+  podcast?: string | null;
+  visual?: string | null;
 }
 
 interface AppState {
@@ -27,7 +34,7 @@ interface AppState {
   
   isLoadingSessions: boolean;
   fetchSessions: () => Promise<void>;
-  addSession: (title?: string, files?: any) => Promise<void>;
+  addSession: (title?: string, files?: any, activeModes?: string[]) => Promise<void>;
   
   activeMode: ModeId;
   setActiveMode: (mode: ModeId) => void;
@@ -72,12 +79,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   
-  addSession: async (title, files) => {
+  addSession: async (title, files, activeModes) => {
     try {
       const res = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, files })
+        body: JSON.stringify({ title, files, activeModes })
       });
       const newSession = await res.json();
       set((state) => ({

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Navbar } from "@/components/landing/Navbar";
 import { LeftAbstractArt, RightAbstractArt } from "@/components/landing/AbstractArt";
 import { Button } from "@/components/ui/button";
-import { Sparkles, ArrowRight, Paperclip, Mic, Image as ImageIcon, FileText, Layers, Gamepad2, Volume2, Network, Check } from "lucide-react";
+import { Sparkles, ArrowRight, Paperclip, Mic, Image as ImageIcon, FileText, Layers, Gamepad2, Volume2, Network, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,10 @@ export default function LandingPage() {
   const router = useRouter();
   const [topic, setTopic] = useState("");
   const [selectedModes, setSelectedModes] = useState<string[]>(["notes"]);
+  const [isDragging, setIsDragging] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const { addSession, setActiveMode } = useAppStore();
 
   const toggleMode = (id: string) => {
@@ -34,19 +38,84 @@ export default function LandingPage() {
     );
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (e.relatedTarget === null || (e.currentTarget.contains && !e.currentTarget.contains(e.relatedTarget as Node))) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setAttachedFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)]);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setAttachedFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
   const handleStartSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!topic.trim()) return;
+    if (!topic.trim() && attachedFiles.length === 0) return;
 
-    await addSession(topic, { pdfs: 0, audio: 0, video: 0, image: 0 });
+    // TODO: Send files securely to LLM endpoint later
+    const metadata = {
+      pdfs: attachedFiles.filter(f => f.type === 'application/pdf').length,
+      audio: attachedFiles.filter(f => f.type.startsWith('audio/')).length,
+      video: attachedFiles.filter(f => f.type.startsWith('video/')).length,
+      image: attachedFiles.filter(f => f.type.startsWith('image/')).length
+    };
+
+    const finalTopic = topic.trim() || (attachedFiles.length > 0 ? attachedFiles[0].name : "New Session");
+
+    await addSession(finalTopic, metadata, selectedModes);
     setActiveMode(selectedModes[0] as any);
     router.push("/dashboard");
   };
 
   return (
-    <div className="h-screen w-full bg-white text-zinc-900 overflow-hidden font-sans flex flex-col relative selection:bg-indigo-500/20 selection:text-indigo-900 z-0">
+    <div 
+      className="h-screen w-full bg-white text-zinc-900 overflow-hidden font-sans flex flex-col relative selection:bg-indigo-500/20 selection:text-indigo-900 z-0"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {/* Drag & Drop Overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-[100] bg-white/80 backdrop-blur-sm border-2 border-dashed border-indigo-500/50 flex flex-col items-center justify-center animate-in fade-in zoom-in-95 duration-200">
+          <div className="w-24 h-24 rounded-full bg-indigo-50 flex items-center justify-center mb-6 animate-bounce">
+            <Paperclip className="w-10 h-10 text-indigo-500" />
+          </div>
+          <h2 className="text-3xl font-bold text-zinc-900 mb-2">Drop your materials here</h2>
+          <p className="text-zinc-500 font-medium">PDFs, Docs, Audio, Video, or Images</p>
+        </div>
+      )}
 
-      {/* Blueprint Dot Grid Background Pattern */}
+      <input 
+        type="file" 
+        multiple 
+        ref={fileInputRef} 
+        onChange={handleFileSelect} 
+        className="hidden" 
+      />
       <div className="absolute inset-0 w-full h-full z-0 pointer-events-none">
         <svg className="w-full h-full opacity-40" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -165,6 +234,20 @@ export default function LandingPage() {
 
             <form onSubmit={handleStartSession} className="w-full flex flex-col gap-3 relative z-30 group animate-in fade-in slide-in-from-bottom-6 duration-700 delay-150">
 
+              {attachedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-1">
+                  {attachedFiles.map((file, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 rounded-lg text-xs font-medium text-zinc-700 transition-colors">
+                      <FileText className="w-3.5 h-3.5 text-zinc-500" />
+                      <span className="truncate max-w-[150px]">{file.name}</span>
+                      <button type="button" onClick={() => removeFile(idx)} className="ml-1 p-0.5 rounded-full hover:bg-zinc-300 text-zinc-500 hover:text-zinc-900 transition-colors">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="relative w-full">
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-indigo-500 to-violet-500 rounded-[20px] blur opacity-[0.10] group-focus-within:opacity-25 transition duration-500 pointer-events-none" />
                 <div className="relative bg-white/95 backdrop-blur-xl border border-zinc-200 shadow-md rounded-2xl px-4 py-3 flex items-center transition-all focus-within:border-zinc-300 focus-within:shadow-xl w-full">
@@ -179,13 +262,13 @@ export default function LandingPage() {
 
               <div className="flex items-center justify-between w-full px-2 z-20">
                 <div className="flex items-center gap-1">
-                  <button type="button" className="p-2 text-zinc-400 hover:text-indigo-600 hover:bg-zinc-100/80 rounded-xl transition-colors shrink-0" title="Attach Document">
+                  <button type="button" onClick={triggerFileInput} className="p-2 text-zinc-400 hover:text-indigo-600 hover:bg-zinc-100/80 rounded-xl transition-colors shrink-0" title="Attach Document">
                     <Paperclip className="w-4 h-4" />
                   </button>
-                  <button type="button" className="p-2 text-zinc-400 hover:text-indigo-600 hover:bg-zinc-100/80 rounded-xl transition-colors shrink-0" title="Image Upload">
+                  <button type="button" onClick={triggerFileInput} className="p-2 text-zinc-400 hover:text-indigo-600 hover:bg-zinc-100/80 rounded-xl transition-colors shrink-0" title="Image Upload">
                     <ImageIcon className="w-4 h-4" />
                   </button>
-                  <button type="button" className="p-2 text-zinc-400 hover:text-indigo-600 hover:bg-zinc-100/80 rounded-xl transition-colors shrink-0" title="Voice Recording">
+                  <button type="button" onClick={triggerFileInput} className="p-2 text-zinc-400 hover:text-indigo-600 hover:bg-zinc-100/80 rounded-xl transition-colors shrink-0" title="Voice Recording">
                     <Mic className="w-4 h-4" />
                   </button>
                 </div>
