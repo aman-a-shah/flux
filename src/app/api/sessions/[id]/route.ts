@@ -77,3 +77,20 @@ export async function PATCH(
     return NextResponse.json({ error: "Failed to update session" }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const resolvedParams = await params;
+    await prisma.session.delete({
+      where: { id: resolvedParams.id }
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting session:", error);
+    return NextResponse.json({ error: "Failed to delete session" }, { status: 500 });
+  }
+}

@@ -35,6 +35,7 @@ interface AppState {
   isLoadingSessions: boolean;
   fetchSessions: () => Promise<void>;
   addSession: (title?: string, files?: any, activeModes?: string[]) => Promise<void>;
+  deleteSession: (id: string) => Promise<void>;
   
   activeMode: ModeId;
   setActiveMode: (mode: ModeId) => void;
@@ -93,6 +94,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       }));
     } catch (e) {
       console.error("Failed to add session", e);
+    }
+  },
+  
+  deleteSession: async (id) => {
+    try {
+      const res = await fetch(`/api/sessions/${id}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        set((state) => ({
+          sessions: state.sessions.filter(s => s.id !== id),
+          activeSessionId: state.activeSessionId === id ? (state.sessions.length > 1 ? state.sessions.find(s => s.id !== id)?.id || null : null) : state.activeSessionId
+        }));
+      }
+    } catch (e) {
+      console.error("Failed to delete session", e);
     }
   },
 

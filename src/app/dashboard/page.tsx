@@ -2,6 +2,7 @@
 
 import { useAppStore } from "@/lib/store";
 import { Plus, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { SessionCard } from "@/components/session/SessionCard";
 
 export default function DashboardPage() {
@@ -16,7 +17,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {/* New Session Card */}
-        <button className="group relative w-full h-[320px] rounded-[24px] bg-white border border-dashed border-zinc-200 hover:border-indigo-300 hover:bg-zinc-50 transition-all flex flex-col items-center justify-center gap-4 shadow-sm">
+        <Link href="/" className="group relative w-full h-[320px] rounded-[24px] bg-white border border-dashed border-zinc-200 hover:border-indigo-300 hover:bg-zinc-50 transition-all flex flex-col items-center justify-center gap-4 shadow-sm">
           <div className="w-14 h-14 rounded-full bg-zinc-50 group-hover:bg-indigo-50 flex items-center justify-center transition-colors border border-zinc-100 group-hover:border-indigo-100">
             <Plus className="w-6 h-6 text-zinc-400 group-hover:text-indigo-500 transition-colors" />
           </div>
@@ -24,7 +25,7 @@ export default function DashboardPage() {
             <h3 className="text-lg font-medium text-zinc-600 group-hover:text-indigo-600 transition-colors">New Session</h3>
             <p className="text-sm font-mono text-zinc-400 mt-1">Upload files to begin</p>
           </div>
-        </button>
+        </Link>
 
         {sessions.map((session) => (
           <SessionCard key={session.id} session={session} />

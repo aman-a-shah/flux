@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Play, Sparkles, FolderDown, ArrowRight, FileText, Mic, Video, Image as ImageIcon } from "lucide-react";
+import { Play, Sparkles, FolderDown, ArrowRight, FileText, Mic, Video, Image as ImageIcon, Trash2 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { useAppStore } from "@/lib/store";
 
 interface SessionCardProps {
   session: {
@@ -20,6 +21,8 @@ interface SessionCardProps {
 }
 
 export function SessionCard({ session }: SessionCardProps) {
+  const deleteSession = useAppStore(state => state.deleteSession);
+  
   return (
     <div className="group relative w-full rounded-[24px] border border-zinc-200 bg-white shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col">
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -32,12 +35,28 @@ export function SessionCard({ session }: SessionCardProps) {
             </h3>
             <p className="text-sm font-mono text-zinc-500">{session.date}</p>
           </div>
-          <div className="w-10 h-10 rounded-full bg-zinc-50 flex items-center justify-center border border-zinc-200 group-hover:border-indigo-200 group-hover:bg-indigo-50 transition-colors shadow-sm">
-            {session.progress >= 100 ? (
-              <Sparkles className="w-5 h-5 text-emerald-500" />
-            ) : (
-              <Play className="w-4 h-4 text-indigo-500 ml-0.5" />
-            )}
+          <div className="flex gap-2 items-center">
+            <div className="w-10 h-10 rounded-full bg-zinc-50 flex items-center justify-center border border-zinc-200 group-hover:border-indigo-200 group-hover:bg-indigo-50 transition-colors shadow-sm">
+              {session.progress >= 100 ? (
+                <Sparkles className="w-5 h-5 text-emerald-500" />
+              ) : (
+                <Play className="w-4 h-4 text-indigo-500 ml-0.5" />
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (confirm("Are you sure you want to delete this session?")) {
+                  deleteSession(session.id);
+                }
+              }}
+              className="w-8 h-8 rounded-full text-zinc-400 hover:text-rose-500 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-all"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 
