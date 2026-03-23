@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { mockSessions } from "@/lib/mockData";
+import * as pdfParse from 'pdf-parse';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -58,38 +59,75 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { title, files, activeModes } = body;
+    const formData = await request.formData();
+    const title = formData.get('title') as string;
+    const activeModesStr = formData.get('activeModes') as string;
+    const activeModes = activeModesStr ? JSON.parse(activeModesStr) : ["notes"];
 
+    const modesToGenerate = activeModes && Array.isArray(activeModes) ? activeModes : ["notes"];
+
+    // Process uploaded files
+    const files = formData.getAll('files') as File[];
+    let extractedContent = '';
+
+    // Extract text from uploaded files
+    for (const file of files) {
+      if (file.type === 'application/pdf') {
+        try {
+          const buffer = Buffer.from(await file.arrayBuffer());
+          const pdfData = await pdfParse(buffer);
+          extractedContent += `\n\n--- PDF: ${file.name} ---\n${pdfData.text}`;
+        } catch (error) {
+          console.error(`Error parsing PDF ${file.name}:`, error);
+          extractedContent += `\n\n--- PDF: ${file.name} (Error parsing) ---`;
+        }
+      } else if (file.type.startsWith('text/')) {
+        try {
+          const text = await file.text();
+          extractedContent += `\n\n--- Text File: ${file.name} ---\n${text}`;
+        } catch (error) {
+          console.error(`Error reading text file ${file.name}:`, error);
+          extractedContent += `\n\n--- Text File: ${file.name} (Error reading) ---`;
+        }
+      }
+      // TODO: Add support for other file types (images with OCR, audio transcription, etc.)
+    }
+
+    // Count file types
+    const fileCounts = {
+      pdfs: files.filter(f => f.type === 'application/pdf').length,
+      audio: files.filter(f => f.type.startsWith('audio/')).length,
+      video: files.filter(f => f.type.startsWith('video/')).length,
+      image: files.filter(f => f.type.startsWith('image/')).length
+    };
+
+    const finalTopic = title || (files.length > 0 ? files[0].name : "New Session");
+
+    // 1. Create the session base
     const newSession = await prisma.session.create({
       data: {
-        title: title || "New Session",
+        title: finalTopic,
         date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
         lastStudied: "Just now",
         progress: 0,
-        pdfCount: files?.pdfs || 0,
-        audioCount: files?.audio || 0,
-        videoCount: files?.video || 0,
-        imageCount: files?.image || 0,
-        activeModes: activeModes && Array.isArray(activeModes) ? activeModes.join(',') : "notes",
+        pdfCount: fileCounts.pdfs,
+        audioCount: fileCounts.audio,
+        videoCount: fileCounts.video,
+        imageCount: fileCounts.image,
+        activeModes: modesToGenerate.join(','),
+        notes: extractedContent, // Store file content in notes field temporarily
       },
     });
 
+    // Return session info for loading page (generation will happen separately)
     const formattedSession = {
       id: newSession.id,
       title: newSession.title,
-      date: newSession.date,
-      lastStudied: newSession.lastStudied,
-      progress: newSession.progress,
-      materials: {
-        pdfs: newSession.pdfCount,
-        audio: newSession.audioCount,
-        video: newSession.videoCount,
-        image: newSession.imageCount,
-      },
+      modes: modesToGenerate,
+      topic: finalTopic,
     };
 
-    return NextResponse.json(formattedSession, { status: 201 });
+    return NextResponse.json(formattedSession);
   } catch (error) {
     console.error("Error creating session:", error);
     return NextResponse.json({ error: "Failed to create session" }, { status: 500 });

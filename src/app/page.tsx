@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { Navbar } from "@/components/landing/Navbar";
 import { LeftAbstractArt, RightAbstractArt } from "@/components/landing/AbstractArt";
 import { Button } from "@/components/ui/button";
-import { Sparkles, ArrowRight, Paperclip, Mic, Image as ImageIcon, FileText, Layers, Gamepad2, Volume2, Network, X } from "lucide-react";
+import { Sparkles, ArrowRight, Paperclip, Mic, Image as ImageIcon, FileText, Layers, Gamepad2, Volume2, Network, X, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,7 @@ const STUDY_MODES = [
   { id: "notes", icon: FileText, label: "Notes" },
   { id: "flashcards", icon: Layers, label: "Flashcards" },
   { id: "quiz", icon: Sparkles, label: "Quiz" },
-  { id: "audio", icon: Volume2, label: "Podcast" },
+  { id: "podcast", icon: Volume2, label: "Podcast" },
   { id: "quest", icon: Gamepad2, label: "Gamify" },
   { id: "visual", icon: Network, label: "Graph" },
 ] as const;
@@ -24,6 +24,7 @@ export default function LandingPage() {
   const [selectedModes, setSelectedModes] = useState<string[]>(["notes"]);
   const [isDragging, setIsDragging] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { addSession, setActiveMode } = useAppStore();
@@ -76,19 +77,25 @@ export default function LandingPage() {
     e.preventDefault();
     if (!topic.trim() && attachedFiles.length === 0) return;
 
-    // TODO: Send files securely to LLM endpoint later
-    const metadata = {
-      pdfs: attachedFiles.filter(f => f.type === 'application/pdf').length,
-      audio: attachedFiles.filter(f => f.type.startsWith('audio/')).length,
-      video: attachedFiles.filter(f => f.type.startsWith('video/')).length,
-      image: attachedFiles.filter(f => f.type.startsWith('image/')).length
-    };
+    setIsProcessing(true);
+    try {
+      const finalTopic = topic.trim() || (attachedFiles.length > 0 ? attachedFiles[0].name : "New Session");
 
-    const finalTopic = topic.trim() || (attachedFiles.length > 0 ? attachedFiles[0].name : "New Session");
-
-    await addSession(finalTopic, metadata, selectedModes);
-    setActiveMode(selectedModes[0] as any);
-    router.push("/dashboard");
+      const response = await addSession(finalTopic, attachedFiles, selectedModes);
+      if (response?.id) {
+        // Redirect to loading page with session info
+        const params = new URLSearchParams({
+          sessionId: response.id,
+          modes: selectedModes.join(','),
+          topic: finalTopic,
+        });
+        router.push(`/loading?${params.toString()}`);
+      }
+    } catch (error) {
+      console.error("Session creation failed:", error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -275,10 +282,19 @@ export default function LandingPage() {
 
                 <Button
                   type="submit"
-                  disabled={!topic.trim()}
-                  className="rounded-lg px-4 h-8 bg-zinc-900 hover:bg-zinc-800 text-white shadow-md font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-xs"
+                  disabled={!topic.trim() || isProcessing}
+                  className="rounded-lg px-4 h-8 bg-zinc-900 hover:bg-zinc-800 text-white shadow-md font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-xs flex items-center gap-2"
                 >
-                  Process <ArrowRight className="w-3 h-3 ml-1" />
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      Process <ArrowRight className="w-3 h-3 ml-1" />
+                    </>
+                  )}
                 </Button>
               </div>
             </form>

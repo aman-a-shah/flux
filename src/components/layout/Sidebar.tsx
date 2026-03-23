@@ -140,19 +140,6 @@ export function Sidebar() {
             ))}
           </div>
         </ScrollArea>
-        
-        {/* Quick Preferences Footer */}
-        <div className="p-4 w-[240px] shrink-0 border-t border-zinc-200 bg-zinc-50/80">
-          <div className="flex items-center gap-3 text-sm text-zinc-600">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100 shadow-sm">
-              <span className="font-bold text-xs">AI</span>
-            </div>
-            <div>
-              <div className="font-medium text-xs text-zinc-900">Flux Assistant</div>
-              <div className="text-[10px] text-zinc-500">&quot;Explain this again&quot;</div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

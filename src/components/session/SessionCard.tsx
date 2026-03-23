@@ -11,7 +11,7 @@ interface SessionCardProps {
     date: string;
     lastStudied: string;
     progress: number;
-    materials: {
+    materials?: {
       pdfs: number;
       audio: number;
       video: number;
@@ -61,22 +61,22 @@ export function SessionCard({ session }: SessionCardProps) {
         </div>
 
         <div className="flex items-center gap-2 mb-6 flex-wrap">
-          {session.materials.pdfs > 0 && (
+          {session.materials?.pdfs !== undefined && session.materials.pdfs > 0 && (
              <div className="flex items-center gap-1.5 text-xs text-zinc-600 bg-zinc-50 px-2.5 py-1.5 rounded-lg border border-zinc-200">
                <FileText className="w-3.5 h-3.5 text-indigo-400" /> {session.materials.pdfs} PDFs
              </div>
           )}
-          {session.materials.audio > 0 && (
+          {session.materials?.audio !== undefined && session.materials.audio > 0 && (
              <div className="flex items-center gap-1.5 text-xs text-zinc-600 bg-zinc-50 px-2.5 py-1.5 rounded-lg border border-zinc-200">
                <Mic className="w-3.5 h-3.5 text-violet-400" /> {session.materials.audio} Audio
              </div>
           )}
-          {session.materials.video > 0 && (
+          {session.materials?.video !== undefined && session.materials.video > 0 && (
              <div className="flex items-center gap-1.5 text-xs text-zinc-600 bg-zinc-50 px-2.5 py-1.5 rounded-lg border border-zinc-200">
                <Video className="w-3.5 h-3.5 text-cyan-400" /> {session.materials.video} Video
              </div>
           )}
-          {session.materials.image > 0 && (
+          {session.materials?.image !== undefined && session.materials.image > 0 && (
              <div className="flex items-center gap-1.5 text-xs text-zinc-600 bg-zinc-50 px-2.5 py-1.5 rounded-lg border border-zinc-200">
                <ImageIcon className="w-3.5 h-3.5 text-emerald-400" /> {session.materials.image} Images
              </div>

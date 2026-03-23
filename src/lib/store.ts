@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type ModeId = "audio" | "quest" | "visual" | "notes" | "flashcards" | "quiz";
+type ModeId = "podcast" | "quest" | "visual" | "notes" | "flashcards" | "quiz";
 
 export interface Session {
   id: string;
@@ -34,7 +34,7 @@ interface AppState {
   
   isLoadingSessions: boolean;
   fetchSessions: () => Promise<void>;
-  addSession: (title?: string, files?: any, activeModes?: string[]) => Promise<void>;
+  addSession: (title?: string, files?: any, activeModes?: string[]) => Promise<any>;
   deleteSession: (id: string) => Promise<void>;
   
   activeMode: ModeId;
@@ -82,18 +82,33 @@ export const useAppStore = create<AppState>((set, get) => ({
   
   addSession: async (title, files, activeModes) => {
     try {
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('activeModes', JSON.stringify(activeModes));
+
+      // Add actual files to FormData
+      if (files && Array.isArray(files)) {
+        files.forEach((file, index) => {
+          formData.append('files', file);
+        });
+      }
+
       const res = await fetch("/api/sessions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, files, activeModes })
+        body: formData
       });
       const newSession = await res.json();
+      
+      // Add to local state
       set((state) => ({
         sessions: [newSession, ...state.sessions],
         activeSessionId: newSession.id
       }));
+      
+      return newSession;
     } catch (e) {
       console.error("Failed to add session", e);
+      throw e;
     }
   },
   
