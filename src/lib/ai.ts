@@ -70,57 +70,122 @@ export async function generateModeContent(mode: ModeId, topic: string, complexit
 
     switch (mode) {
       case 'notes':
-        userPrompt = `You are an expert educator. Your task is to transform the provided source material into high-quality, professional study notes that are both comprehensive and easy to read.
+        userPrompt = `You are an expert educator creating beautiful, visually engaging study notes. Transform the provided source material into professional study notes that are comprehensive, well-organized, and a pleasure to read.
 
 REQUIREMENTS:
-1. **Structuring for Clarity**: 
-   - Use a clear hierarchy with H2 (##) for major sections and H3 (###) for sub-topics.
-   - Start with a compelling **Executive Summary** or **Overview**.
-2. **Deep Content Extraction**:
-   - Don't just summarize; extract all key definitions, formulas, and technical details.
-   - Identify and explain complex concepts in detail.
-   - Include any code snippets or examples exactly as they appear in the source, formatted correctly.
-3. **Visual Organization**:
-   - Use bullet points and numbered lists for readability.
-   - Use **bold** for key terms and *italics* for emphasis.
-   - Use callout blocks (> ) for important insights, warnings, or "Pro-tips".
-   - Use tables (| Column |) where data or comparisons are present in the source.
-4. **Formatting Reconstruction**:
-   - The source text may have extraction artifacts (missing spaces, broken lines). **YOUR FIRST JOB is to mentally reconstruct the correct text and present it perfectly.** Fix any spacing or formatting issues from the raw input in your output.
-5. **Comprehensive Sections**:
-   - **Introduction**: Context and scope.
-   - **Detailed Breakdown**: The core material organized logically (not necessarily chronologically).
-   - **Key Terms & Definitions**: A dedicated glossary-style section.
-   - **Summary & Next Steps**: Actionable takeaways.
 
-Format the entire response in beautiful, clean GitHub-flavored Markdown.`;
+1. **Structure & Hierarchy**:
+   - Start with an # (H1) title summarizing the topic
+   - Use ## (H2) for major sections and ### (H3) for subsections
+   - Create an **Executive Summary** section early to give overview
+   - Follow with logical sections: Introduction → Core Concepts → Details → Key Terms → Practical Applications → Summary
+
+2. **Content Depth**:
+   - Extract ALL key definitions, formulas, laws, and technical details from the source
+   - Explain complex concepts thoroughly with multiple examples
+   - Include code snippets, equations, or examples EXACTLY as they appear in source
+   - Connect ideas logically to show relationships
+
+3. **Visual Formatting** (ESSENTIAL):
+   - Use **bold** for key terms and important concepts on first mention
+   - Use *italics* for emphasis and technical distinctions
+   - Use > blockquotes for important insights, warnings, tips, or "remember this" moments
+   - Use numbered lists (1. 2. 3.) for sequential steps or processes
+   - Use bullet points (- or *) for features, characteristics, or non-sequential items
+   - Use code blocks (\`\`\`language) for code examples, commands, or technical syntax
+   - Use tables (|Col1|Col2|) for comparisons, data, timelines, or structured information
+
+4. **Special Sections**:
+   - Include a **Key Terms & Definitions** glossary section with important terms and their meanings
+   - Include a **Pro Tips** or **Important Notes** section with > blockquotes highlighting critical insights
+   - Include **Common Misconceptions** if applicable to address misunderstandings
+
+5. **Formatting Quality**:
+   - Fix any text extraction artifacts (missing spaces, broken sentences, formatting errors)
+   - Ensure proper spacing between sections (one blank line between major sections, two blank lines between big sections)
+   - Keep paragraphs concise and readable (3-4 sentences maximum per paragraph)
+   - Use white space strategically to avoid walls of text
+
+6. **Engagement**:
+   - Make the notes engaging and interesting to read
+   - Use clear, accessible language without losing technical accuracy
+   - Include examples and real-world applications where relevant
+   - Break up content with visual markers (tables, code blocks, blockquotes)
+
+IMPORTANT: Start directly with the H1 title. Do NOT include any introductory text like "Sure, I can help you with that!" or "Here are the study notes...". Jump straight into the content.
+
+Format the entire response in pristine GitHub-flavored Markdown with proper spacing and structure.`;
         break;
       
       case 'flashcards':
         isJsonMode = true;
-        userPrompt = `Create a set of 5 to 7 Flashcards.
-        You MUST respond in valid JSON format:
-        { "flashcards": [ { "front": "Q", "back": "A" } ] }`;
+        userPrompt = `Create a comprehensive set of 8-10 flashcards based on the source material.
+
+REQUIREMENTS:
+1. **Coverage**: Select the most important concepts, definitions, formulas, and practical applications
+2. **Balance**: Mix concept questions with application questions for deeper learning
+3. **Clarity**: Front should be a clear, concise question. Back should be complete but concise answer
+4. **Formatting**: 
+   - Use markdown formatting in answers (bold for key terms, code blocks for technical content, bullet points for lists)
+   - Include examples or mnemonics where helpful
+5. **Difficulty**: Progress from foundational to more advanced concepts
+
+You MUST respond in valid JSON format:
+{ "flashcards": [ { "front": "Question text", "back": "Answer with **bold** for key terms, bullets, code blocks as needed" } ] }`;
         break;
 
       case 'quiz':
         isJsonMode = true;
-        userPrompt = `Create a 5-question multiple choice quiz.
-        You MUST respond in valid JSON:
-        { "quiz": [ { "question": "Q", "options": ["A","B","C","D"], "answer_index": 0, "explanation": "E" } ] }`;
+        userPrompt = `Create a 5-question multiple choice quiz that tests understanding of the source material.
+
+REQUIREMENTS:
+1. **Coverage**: Mix recall questions with comprehension and application questions
+2. **Quality**: 
+   - Each option should be plausible (avoid obviously wrong answers)
+   - Explanations should clarify why the correct answer is right and why others are wrong
+   - Include edge cases or common misconceptions in distractors
+3. **Difficulty**: Progress from easier to more challenging questions
+4. **Educational Value**: Explanations should deepen learning, not just confirm the answer
+
+You MUST respond in valid JSON:
+{ "quiz": [ { "question": "Q", "options": ["A","B","C","D"], "answer_index": 0, "explanation": "Clear explanation of the correct answer" } ] }`;
         break;
 
       case 'quest':
         isJsonMode = true;
-        userPrompt = `Create an interactive text-based RPG 'Quest' scenario.
-        You MUST respond in valid JSON:
-        { "story": "...", "options": ["C1", "C2", "C3"] }`;
+        userPrompt = `Create an interactive text-based RPG 'Quest' scenario based on the source material. Make it educational and engaging!
+
+REQUIREMENTS:
+1. **Educational Tie-in**: Embed concepts from the source material into the narrative and decision points
+2. **Narrative Quality**:
+   - Write compelling story prose (2-3 sentences) that draws the player in
+   - Make decisions meaningfully different (not just cosmetic variations)
+   - Show consequences of choices through the next story segment
+3. **Structure**:
+   - Include vivid descriptions, dialogue, or world-building details
+   - Present 3 meaningful choices (not 1, not 5)
+   - Make some choices educationally significant (apply the learned concepts)
+
+You MUST respond in valid JSON:
+{ "story": "Engaging narrative text with world-building and situation setup", "options": ["First meaningful choice", "Second meaningful choice", "Third meaningful choice"] }`;
         break;
 
       case 'visual':
-        userPrompt = `Create a visual graph representing relationships.
-        You MUST respond with RAW Mermaid.js code ONLY. Do not use markdown code blocks (\`\`\`).
-        Start directly with 'graph TD' or 'mindmap'.`;
+        userPrompt = `Create a visual graph or diagram representing key relationships and concepts from the source material.
+
+REQUIREMENTS:
+1. **Structure**: Choose the best visualization type:
+   - 'graph TD' (flowchart) for processes, hierarchies, or decision flows
+   - 'mindmap' for concept relationships and brainstorming
+   - 'graph LR' for left-to-right relationships
+2. **Content**: 
+   - Show relationships between key concepts
+   - Include 6-10 nodes representing important ideas
+   - Use descriptive labels that are clear and concise
+3. **Educational Value**: The diagram should help learners understand connections between concepts
+
+You MUST respond with RAW Mermaid.js code ONLY. Do not use markdown code blocks (\`\`\`).
+Start directly with 'graph', 'mindmap', or another Mermaid diagram type. Example: 'graph TD' or 'mindmap'`;
         break;
 
       case 'podcast':
