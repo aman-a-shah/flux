@@ -188,12 +188,16 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide p-1">
-          {view === "files" ? renderFilesView() : view === "chat" ? renderChatView() : (
+        <div className="flex-1 overflow-hidden p-1 flex flex-col">
+          {view === "files" ? (
+            <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide">
+              {renderFilesView()}
+            </div>
+          ) : view === "chat" ? renderChatView() : (
             <>
               {activeMode === "notes" && (
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  <div className="flex justify-between items-center mb-6">
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 flex flex-col h-full">
+                  <div className="flex justify-between items-center mb-6 shrink-0">
                     <h2 className="text-2xl font-bold font-sans tracking-tight text-zinc-900 flex items-center gap-2">
                       <FileText className="w-6 h-6 text-indigo-500" />
                       Smart Notes
@@ -234,6 +238,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                   </div>
                   */}
 
+                  <div className="flex-1 overflow-y-auto pb-24 pr-2 mb-6">
                   {generating || (session.notes && session.notes.includes("[RAW_EXTRACTION_BEGIN]")) ? (
                     renderGeneratingState("notes")
                   ) : (
@@ -250,10 +255,13 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                       )}
                     </div>
                   )}
+                  </div>
                 </div>
               )}
 
-              {activeMode === "podcast" && (
+              {activeMode !== "notes" && (
+                <div className="flex-1 overflow-y-auto pb-24 scrollbar-hide">
+                {activeMode === "podcast" && (
                 <div className="animate-in fade-in zoom-in-95 duration-500 flex flex-col border border-zinc-200 rounded-[32px] bg-white shadow-sm overflow-hidden p-8">
                   <div className="w-16 h-16 rounded-full bg-violet-50 flex items-center justify-center mb-6 border border-violet-100">
                     <Volume2 className="w-8 h-8 text-violet-500" />
@@ -397,6 +405,8 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                       Generate Dependencies
                     </Button>
                   )}
+                </div>
+              )}
                 </div>
               )}
             </>
