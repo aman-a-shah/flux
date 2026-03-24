@@ -27,7 +27,7 @@ export const mockSessions = [
 
 export const fluxModes = [
   { id: "notes", name: "Smart Notes", icon: "FileText", description: "Structured & clear", color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-100" },
-  { id: "audio", name: "Audio Immersion", icon: "Mic", description: "Listen anywhere", color: "text-violet-600", bg: "bg-violet-50", border: "border-violet-100" },
+  { id: "podcast", name: "Audio Immersion", icon: "Mic", description: "Listen anywhere", color: "text-violet-600", bg: "bg-violet-50", border: "border-violet-100" },
   { id: "visual", name: "Visual Mind Map", icon: "Network", description: "See concepts", color: "text-cyan-600", bg: "bg-cyan-50", border: "border-cyan-100" },
   { id: "quest", name: "Quest Mode", icon: "Gamepad2", description: "5-min challenges", color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-100" },
   { id: "flashcards", name: "Flashcards", icon: "Layers", description: "Spaced repetition", color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },

@@ -28,7 +28,9 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
 
   useEffect(() => {
     // Automatically trigger generation for the active mode if it hasn't been generated yet
-    if (session && !session[activeMode] && !generating && !view) {
+    // Or if it contains raw extraction data that needs to be processed
+    const isRaw = session?.notes?.includes("[RAW_EXTRACTION_BEGIN]");
+    if (session && (!session[activeMode] || (activeMode === 'notes' && isRaw)) && !generating && !view) {
       generateContent(activeMode);
     }
   }, [activeMode, session, preferences.complexity, view]);
@@ -55,6 +57,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
+          sessionId: session.id,
           topic: session.title, 
           complexity: preferences.complexity 
         }),
@@ -180,7 +183,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       <div className="w-full max-w-5xl px-8 flex flex-col h-full bg-transparent z-10">
         {!view && (
           <div className="pt-8 pb-4 shrink-0">
-            <ModeSelector />
+            <ModeSelector activeModes={session.activeModes} />
           </div>
         )}
 
@@ -228,7 +231,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                     </div>
                   </div>
 
-                  {generating && !session.notes ? (
+                  {generating || (session.notes && session.notes.includes("[RAW_EXTRACTION_BEGIN]")) ? (
                     renderGeneratingState("notes")
                   ) : (
                     <div className="prose prose-zinc max-w-none bg-white border border-zinc-200 rounded-[24px] p-8 shadow-sm relative">
@@ -247,7 +250,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                 </div>
               )}
 
-              {activeMode === "audio" && (
+              {activeMode === "podcast" && (
                 <div className="animate-in fade-in zoom-in-95 duration-500 flex flex-col border border-zinc-200 rounded-[32px] bg-white shadow-sm overflow-hidden p-8">
                   <div className="w-16 h-16 rounded-full bg-violet-50 flex items-center justify-center mb-6 border border-violet-100">
                     <Volume2 className="w-8 h-8 text-violet-500" />

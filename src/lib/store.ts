@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type ModeId = "podcast" | "quest" | "visual" | "notes" | "flashcards" | "quiz";
+type ModeId = "podcast" | "quest" | "visual" | "notes" | "flashcards" | "quiz" | "audio";
 
 export interface Session {
   id: string;
@@ -83,8 +83,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   addSession: async (title, files, activeModes) => {
     try {
       const formData = new FormData();
-      formData.append('title', title);
-      formData.append('activeModes', JSON.stringify(activeModes));
+      if (title) {
+        formData.append('title', title);
+      }
+      if (activeModes) {
+        formData.append('activeModes', JSON.stringify(activeModes));
+      }
 
       // Add actual files to FormData
       if (files && Array.isArray(files)) {

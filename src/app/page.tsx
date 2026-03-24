@@ -282,7 +282,7 @@ export default function LandingPage() {
 
                 <Button
                   type="submit"
-                  disabled={!topic.trim() || isProcessing}
+                  disabled={(!topic.trim() && attachedFiles.length === 0) || isProcessing}
                   className="rounded-lg px-4 h-8 bg-zinc-900 hover:bg-zinc-800 text-white shadow-md font-medium transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:pointer-events-none text-xs flex items-center gap-2"
                 >
                   {isProcessing ? (

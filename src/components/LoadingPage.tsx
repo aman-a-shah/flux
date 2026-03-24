@@ -55,7 +55,16 @@ export default function LoadingPage({ sessionId, selectedModes, topic }: Loading
               const newlyCompleted: string[] = [];
               selectedModes.forEach(mode => {
                 const dbField = mode === "podcast" ? "podcast" : mode;
-                if (session[dbField] && !completedModes.has(mode)) {
+                const fieldContent = session[dbField];
+                
+                // Field is complete if it has actual generated content
+                // For notes: check for [GENERATED_NOTES] marker indicating generation happened
+                // For others: just check if field has content
+                const isComplete = mode === 'notes' 
+                  ? fieldContent && fieldContent.includes('[GENERATED_NOTES]')
+                  : fieldContent && fieldContent.length > 0;
+                
+                if (isComplete && !completedModes.has(mode)) {
                   newlyCompleted.push(mode);
                 }
               });
@@ -67,7 +76,11 @@ export default function LoadingPage({ sessionId, selectedModes, topic }: Loading
 
               const completedCount = selectedModes.filter(mode => {
                 const dbField = mode === "podcast" ? "podcast" : mode;
-                return session[dbField];
+                const fieldContent = session[dbField];
+                // Count complete if it has generated content
+                return mode === 'notes'
+                  ? fieldContent && fieldContent.includes('[GENERATED_NOTES]')
+                  : fieldContent && fieldContent.length > 0;
               }).length;
 
               setProgress((completedCount / selectedModes.length) * 100);

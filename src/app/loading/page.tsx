@@ -1,9 +1,10 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import LoadingPage from "@/components/LoadingPage";
 
-export default function LoadingRoute() {
+function LoadingContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('sessionId') || '';
   const modes = searchParams.get('modes')?.split(',') || [];
@@ -15,5 +16,13 @@ export default function LoadingRoute() {
       selectedModes={modes}
       topic={topic}
     />
+  );
+}
+
+export default function LoadingRoute() {
+  return (
+    <Suspense fallback={<div className="h-screen w-full bg-white flex items-center justify-center">Loading...</div>}>
+      <LoadingContent />
+    </Suspense>
   );
 }

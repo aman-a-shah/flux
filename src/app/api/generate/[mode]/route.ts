@@ -6,13 +6,25 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request, { params }: { params: Promise<{ mode: string }> }) {
   try {
     const { mode } = await params;
-    const { topic, complexity } = await req.json();
+    const { topic, complexity, sessionId } = await req.json();
 
     if (!topic) {
       return NextResponse.json({ error: "Topic is required" }, { status: 400 });
     }
 
-    const { result, error } = await generateModeContent(mode as ModeId, topic, complexity || 50);
+    let fileContent = "";
+    if (sessionId) {
+      const { prisma } = await import("@/lib/prisma");
+      const session = await prisma.session.findUnique({
+        where: { id: sessionId },
+        select: { notes: true }
+      });
+      if (session?.notes) {
+        fileContent = session.notes;
+      }
+    }
+
+    const { result, error } = await generateModeContent(mode as ModeId, topic, complexity || 50, fileContent);
 
     if (error) {
       return NextResponse.json({ error }, { status: 500 });

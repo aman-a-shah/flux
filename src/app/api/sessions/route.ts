@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { mockSessions } from "@/lib/mockData";
-import * as pdfParse from 'pdf-parse';
+import { parseFile } from "@/lib/fileParser";
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -47,6 +47,7 @@ export async function GET() {
         video: s.videoCount,
         image: s.imageCount,
       },
+      activeModes: s.activeModes?.split(',') || [],
       createdAt: s.createdAt,
     }));
 
@@ -56,6 +57,9 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch sessions" }, { status: 500 });
   }
 }
+
+// Temporary storage for extracted content during session creation
+const extractedContentMap = new Map<string, string>();
 
 export async function POST(request: Request) {
   try {
@@ -70,40 +74,38 @@ export async function POST(request: Request) {
     const files = formData.getAll('files') as File[];
     let extractedContent = '';
 
-    // Extract text from uploaded files
+    // Process each file based on type
+    console.log(`[Sessions POST] Processing ${files.length} files`);
     for (const file of files) {
-      if (file.type === 'application/pdf') {
-        try {
-          const buffer = Buffer.from(await file.arrayBuffer());
-          const pdfData = await pdfParse(buffer);
-          extractedContent += `\n\n--- PDF: ${file.name} ---\n${pdfData.text}`;
-        } catch (error) {
-          console.error(`Error parsing PDF ${file.name}:`, error);
-          extractedContent += `\n\n--- PDF: ${file.name} (Error parsing) ---`;
-        }
-      } else if (file.type.startsWith('text/')) {
-        try {
-          const text = await file.text();
-          extractedContent += `\n\n--- Text File: ${file.name} ---\n${text}`;
-        } catch (error) {
-          console.error(`Error reading text file ${file.name}:`, error);
-          extractedContent += `\n\n--- Text File: ${file.name} (Error reading) ---`;
-        }
+      try {
+        console.log(`[File Parser] Parsing: ${file.name} (${file.type}, ${file.size} bytes)`);
+        const parsed = await parseFile(file);
+        console.log(`[File Parser] ✓ Parsed ${file.name}: Got ${parsed.content.length} chars of content (type: ${parsed.type})`);
+        extractedContent += `\n\n--- ${file.name} (${parsed.type.toUpperCase()}) ---\n${parsed.content}`;
+      } catch (error) {
+        console.error(`[File Parser] ✗ Error processing file ${file.name}:`, error);
+        extractedContent += `\n\n--- ${file.name} (ERROR) ---\n[Error processing file: ${error instanceof Error ? error.message : 'Unknown error'}]`;
       }
-      // TODO: Add support for other file types (images with OCR, audio transcription, etc.)
     }
 
     // Count file types
     const fileCounts = {
-      pdfs: files.filter(f => f.type === 'application/pdf').length,
-      audio: files.filter(f => f.type.startsWith('audio/')).length,
-      video: files.filter(f => f.type.startsWith('video/')).length,
-      image: files.filter(f => f.type.startsWith('image/')).length
+      pdfs: files.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')).length,
+      audio: files.filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg|flac|wma)$/i.test(f.name)).length,
+      video: files.filter(f => f.type.startsWith('video/') || /\.(mp4|webm|avi|mkv|mov|flv|wmv)$/i.test(f.name)).length,
+      image: files.filter(f => f.type.startsWith('image/') || /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name)).length
     };
 
     const finalTopic = title || (files.length > 0 ? files[0].name : "New Session");
 
-    // 1. Create the session base
+    console.log(`[Sessions POST] Total extracted content: ${extractedContent.length} chars`);
+    console.log(`[Sessions POST] Files processed: PDFs=${fileCounts.pdfs}, Audio=${fileCounts.audio}, Video=${fileCounts.video}, Images=${fileCounts.image}`);
+    
+    // 1. Create the session base WITH extracted content in notes field for now
+    // (marked so we can distinguish it from generated notes)
+    const notesContent = extractedContent.trim() ? `[EXTRACTION_ONLY]\n${extractedContent}\n[END_EXTRACTION_ONLY]` : null;
+    console.log(`[Sessions POST] Storing in notes field: ${notesContent ? notesContent.length : 0} chars`);
+    
     const newSession = await prisma.session.create({
       data: {
         title: finalTopic,
@@ -115,9 +117,12 @@ export async function POST(request: Request) {
         videoCount: fileCounts.video,
         imageCount: fileCounts.image,
         activeModes: modesToGenerate.join(','),
-        notes: extractedContent, // Store file content in notes field temporarily
+        // Store extracted content with clear markers so we can distinguish from generated notes
+        notes: notesContent,
       },
     });
+
+    console.log(`[Sessions POST] ✓ Session ${newSession.id} created with modes: ${modesToGenerate.join(', ')}`);
 
     // Return session info for loading page (generation will happen separately)
     const formattedSession = {

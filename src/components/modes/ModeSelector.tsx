@@ -5,12 +5,21 @@ import { fluxModes } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 import * as Icons from "lucide-react";
 
-export function ModeSelector() {
+interface ModeSelectorProps {
+  activeModes?: string[];
+}
+
+export function ModeSelector({ activeModes }: ModeSelectorProps) {
   const { activeMode, setActiveMode } = useAppStore();
+
+  // Filter modes to only show active ones, or show all if no activeModes specified
+  const availableModes = activeModes
+    ? fluxModes.filter(mode => activeModes.includes(mode.id))
+    : fluxModes;
 
   return (
     <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide snap-x">
-      {fluxModes.map((mode) => {
+      {availableModes.map((mode) => {
         const Icon = Icons[mode.icon as keyof typeof Icons] as React.ElementType;
         const isActive = activeMode === mode.id;
 
@@ -20,15 +29,15 @@ export function ModeSelector() {
             onClick={() => setActiveMode(mode.id as Parameters<typeof setActiveMode>[0])}
             className={cn(
               "snap-start shrink-0 relative flex items-center gap-3 px-5 py-3 rounded-[20px] transition-all duration-300 border",
-              isActive 
-                ? `bg-white border-zinc-200 shadow-sm` 
+              isActive
+                ? `bg-white border-zinc-200 shadow-sm`
                 : `bg-zinc-50/50 border-transparent hover:bg-white hover:border-zinc-200 hover:shadow-sm`
             )}
           >
             {isActive && (
               <div className={cn("absolute inset-0 rounded-[20px] opacity-10 transition-opacity", mode.bg)} />
             )}
-            
+
             <div className={cn(
               "w-10 h-10 rounded-xl flex items-center justify-center transition-all border",
               isActive ? `${mode.bg} ${mode.border}` : "bg-white border-zinc-100",
@@ -36,7 +45,7 @@ export function ModeSelector() {
             )}>
               <Icon className="w-5 h-5" />
             </div>
-            
+
             <div className="text-left">
               <div className={cn(
                 "font-medium text-sm transition-colors",
