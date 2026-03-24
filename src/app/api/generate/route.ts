@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export async function POST(request: Request) {
   try {
     const reqBody = await request.json();
-    const { sessionId, modes, topic, complexity } = reqBody;
+    const { sessionId, modes, topic, complexity, continueQuest } = reqBody;
 
     if (!sessionId || !modes || !Array.isArray(modes)) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -53,7 +53,8 @@ export async function POST(request: Request) {
 
     for (const mode of modes) {
       try {
-        const { result, error } = await generateModeContent(mode as ModeId, topic, complexityValue, extractedContent);
+        const isContinueQuest = mode === 'quest' && continueQuest;
+        const { result, error } = await generateModeContent(mode as ModeId, topic, complexityValue, extractedContent, isContinueQuest ? continueQuest : undefined);
 
         if (error) {
           console.error(`Generation error for ${mode}: ${error}`);

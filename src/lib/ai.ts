@@ -24,8 +24,8 @@ async function generateAudio(text: string): Promise<string | null> {
     const client = new ElevenLabsClient({ apiKey });
     const audioStream = await client.textToSpeech.convert(VOICE_ID, {
       text: text.slice(0, 5000),
-      model_id: "eleven_multilingual_v2",
-      output_format: "mp3_44100_128",
+      modelId: "eleven_multilingual_v2",
+      outputFormat: "mp3_44100_128",
     });
 
     const chunks: Buffer[] = [];
@@ -80,7 +80,7 @@ function cleanJsonString(str: string): string {
   return result;
 }
 
-export async function generateModeContent(mode: ModeId, topic: string, complexity: number, fileContent?: string): Promise<GenerationResult> {
+export async function generateModeContent(mode: ModeId, topic: string, complexity: number, fileContent?: string, continueQuest?: { choice: string; previousStory: string; step: number }): Promise<GenerationResult> {
   const cerebrasKey = process.env.CEREBRAS_API_KEY;
 
   const isMock = !cerebrasKey || cerebrasKey.startsWith("dummy_") || cerebrasKey === "" || cerebrasKey === "your-cerebras-api-key-here";
@@ -208,7 +208,31 @@ IMPORTANT: This response must be valid JSON; do not add any freeform text.`;
 
       case 'quest':
         isJsonMode = true;
-        userPrompt = `Create an interactive text-based RPG 'Quest' scenario based on the source material. Make it educational and engaging!
+        if (continueQuest) {
+          userPrompt = `Continue the interactive text-based RPG 'Quest' scenario based on the source material.
+
+Previous story so far: "${continueQuest.previousStory}"
+
+The player chose: "${continueQuest.choice}"
+
+Current step: ${continueQuest.step}
+
+REQUIREMENTS:
+1. **Continue the Narrative**: Write the next story segment (2-3 sentences) that follows from the player's choice.
+2. **Evaluate Choice**: Determine if the choice was educationally correct or appropriate based on the source material. If correct, progress positively; if incorrect, show consequences.
+3. **Game Logic**: 
+   - If this is step 3 or later, decide if the player wins (good choices) or loses (bad choices).
+   - Include "win": true or "lose": true in the response if the game ends.
+4. **Structure**:
+   - Present 3 new meaningful choices for the next step, or empty array if game ended.
+   - Make choices educationally significant.
+5. **Formatting**:
+   - Return valid JSON ONLY:
+     { "story": "...", "options": ["...", "...", "..."], "step": ${continueQuest.step + 1} } or { "story": "...", "options": [], "win": true, "step": ${continueQuest.step + 1} } or { "story": "...", "options": [], "lose": true, "step": ${continueQuest.step + 1} }
+
+IMPORTANT: This response must be valid JSON; do not add any freeform text.`;
+        } else {
+          userPrompt = `Create an interactive text-based RPG 'Quest' scenario based on the source material. Make it educational and engaging!
 
 REQUIREMENTS:
 1. **Educational Tie-in**: Embed concepts from the source material into the narrative and decision points
@@ -222,9 +246,10 @@ REQUIREMENTS:
    - Make some choices educationally significant (apply the learned concepts)
 4. **Formatting**:
    - Return valid JSON ONLY:
-     { "story": "...", "options": ["...", "...", "..."] }
+     { "story": "...", "options": ["...", "...", "..."], "step": 1 }
 
 IMPORTANT: This response must be valid JSON; do not add any freeform text.`;
+        }
         break;
 
       case 'visual':
@@ -375,5 +400,121 @@ IMPORTANT: The "script" field should ONLY contain the spoken text to be fed into
     // Return mock content on error
     const mockResult = generateMockContent(mode, topic, fileContent);
     return mockResult;
+  }
+}
+
+function generateDefaultContent(mode: ModeId, topic: string): string | object {
+  // Generate reasonable default content for each mode
+  switch (mode) {
+    case 'flashcards':
+      return { 
+        flashcards: [
+          { front: `What is ${topic}?`, back: "A topic for study and learning." },
+          { front: "Why is this important?", back: "It helps with understanding the subject." }
+        ]
+      };
+    case 'quiz':
+      return { 
+        quiz: [
+          { 
+            question: `Which of these best describes ${topic}?`, 
+            options: ["Option A", "Option B", "Option C", "Option D"], 
+            answer_index: 0, 
+            explanation: "This is the most accurate description." 
+          }
+        ]
+      };
+    case 'quest':
+      return { 
+        story: `You encounter a scenario related to ${topic}...`, 
+        options: ["Choose option A", "Choose option B", "Choose option C"],
+        step: 1
+      };
+    case 'visual':
+      return `graph TD\n  A["${topic}"] --> B["Key Concept 1"]\n  A --> C["Key Concept 2"]\n  B --> D["Application"]\n  C --> D`;
+    case 'podcast':
+      return { script: `Welcome to our podcast about ${topic}. Let's dive into the key aspects...`, audioUrl: null };
+    default:
+      return { content: `Information about ${topic}` };
+  }
+}
+
+async function generateMockContent(mode: ModeId, topic: string, fileContent?: string): Promise<GenerationResult> {
+  // Simulate network delay
+  await new Promise(r => setTimeout(r, 1000));
+
+  const contentSource = fileContent && fileContent.trim() ? `based on uploaded content` : `about ${topic}`;
+
+  switch (mode) {
+    case 'notes':
+      return { result: `### Notes on ${topic}\n\nThis is a highly structured set of notes ${contentSource}. \n\n#### Key Areas\n- **Concept 1**: Foundational principles.\n- **Concept 2**: Advanced applications.\n\n> 💡 Key Insight: Understanding ${topic} requires a holistic view of its components.\n\nSummary: Flux has synthesized this content for your learning journey in mock mode.` };
+    case 'flashcards':
+      return { result: `1. **Front:** What is the primary goal of ${topic}?
+   **Back:** To provide a comprehensive framework for learning and understanding key concepts.
+
+2. **Front:** Who is the target audience for ${topic}?
+   **Back:** Students and lifelong learners using Flux to enhance their knowledge.
+
+3. **Front:** What are the main benefits of studying ${topic}?
+   **Back:** Improved understanding, better problem-solving skills, and practical application of concepts.
+
+4. **Front:** How does ${topic} relate to real-world applications?
+   **Back:** ${topic} provides foundational knowledge that can be applied to various real-world scenarios and challenges.` };
+    case 'quiz':
+      return { result: `1. **Question:** Which of these best describes ${topic}?
+   **Options:**
+   A) A comprehensive framework for learning
+   B) A simple concept with limited applications
+   C) An outdated approach to education
+   D) A purely theoretical subject
+   **Correct Answer:** A) A comprehensive framework for learning
+   **Explanation:** ${topic} provides a structured approach to understanding complex concepts and their applications.
+
+2. **Question:** What is the primary purpose of studying ${topic}?
+   **Options:**
+   A) To memorize facts without understanding
+   B) To develop critical thinking and problem-solving skills
+   C) To complete academic requirements only
+   D) To impress others with knowledge
+   **Correct Answer:** B) To develop critical thinking and problem-solving skills
+   **Explanation:** ${topic} helps build analytical skills and practical understanding beyond mere memorization.` };
+    case 'quest':
+      return { result: {
+        story: `You arrive at the Temple of ${topic}, a magnificent structure built from knowledge and wisdom. Ancient runes glow on the walls, each representing a key concept from the source material. A wise sage approaches you, their eyes sparkling with the light of understanding.
+
+"You have come seeking knowledge," the sage says. "But knowledge must be earned through choices that test your understanding. Are you ready to begin your journey?"
+
+As you stand before three glowing portals, each representing a different path of learning, you must choose your approach to mastering ${topic}.`,
+        options: ["Enter the Portal of Foundations - Focus on building strong basic concepts first", "Enter the Portal of Applications - Learn through real-world examples and practical scenarios", "Enter the Portal of Integration - Connect different concepts to see the bigger picture"],
+        step: 1
+      } };
+    case 'visual':
+      return { result: `graph TD\n  A[${topic}] --> B(Phase 1)\n  A --> C(Phase 2)\n  B --> D{Result}\n  C --> D` };
+    case 'podcast':
+      return { result: `**Podcast Script: Exploring ${topic}**
+
+Welcome to the Flux Learning Podcast! Today, we're diving deep into ${topic}, a fascinating subject that combines theory with practical applications.
+
+${topic} represents a comprehensive framework for understanding complex concepts. At its core, ${topic} helps us break down intricate ideas into manageable, learnable components. Whether you're a student, professional, or lifelong learner, mastering ${topic} opens up new possibilities for problem-solving and innovation.
+
+One of the most interesting aspects of ${topic} is how it connects theoretical foundations with real-world applications. For example, the principles of ${topic} can be seen in everything from everyday decision-making to complex system design.
+
+As we continue our learning journey, remember that ${topic} is not just about memorizing facts—it's about developing a deep, intuitive understanding that you can apply in countless situations.
+
+Thanks for joining us on the Flux Learning Podcast. Keep exploring, keep learning!` };
+    case 'audio':
+      return { result: `**Audio Learning Session: ${topic} Fundamentals**
+
+Welcome to your Flux audio learning immersion. Today, we're exploring the fundamentals of ${topic}.
+
+${topic} is a comprehensive field that combines theoretical knowledge with practical applications. Understanding ${topic} helps us make better decisions and solve complex problems in our daily lives and professional work.
+
+The key principles of ${topic} include foundational concepts that build upon each other. By mastering these building blocks, you develop a strong framework for tackling more advanced topics and real-world challenges.
+
+Remember, learning ${topic} is a journey, not a destination. Each concept you master brings you closer to a deeper understanding of how things work and how to apply that knowledge effectively.
+
+Thank you for joining this audio learning session. Continue exploring and building your knowledge base!` };
+    default:
+      return { result: null, error: "Unknown mode" };
   }
 }

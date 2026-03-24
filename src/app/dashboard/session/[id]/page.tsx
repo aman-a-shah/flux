@@ -22,6 +22,9 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [generating, setGenerating] = useState(false);
   const [tweakPrompt, setTweakPrompt] = useState("");
   const [failedModes, setFailedModes] = useState<Record<string, boolean>>({});
+  const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
+  const [quizSubmitted, setQuizSubmitted] = useState(false);
+  const [quizScore, setQuizScore] = useState<number | null>(null);
 
   const fetchSession = useCallback(async () => {
     try {
@@ -77,6 +80,37 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMode, session, preferences.complexity, view, generating, failedModes, setActiveMode]);
+
+  const continueQuest = async (choice: string) => {
+    if (!session || !session.quest) return;
+    setGenerating(true);
+    try {
+      const res = await fetch(`/api/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: session.id,
+          modes: ['quest'],
+          topic: session.title,
+          complexity: preferences.complexity,
+          continueQuest: {
+            choice,
+            previousStory: (session.quest as any).story,
+            step: (session.quest as any).step || 1
+          }
+        }),
+      });
+      if (res.ok) {
+        await fetchSession();
+      } else {
+        console.error('Failed to continue quest');
+      }
+    } catch (error) {
+      console.error('Error continuing quest:', error);
+    } finally {
+      setGenerating(false);
+    }
+  };
 
   const generateContent = async (modeOrModes: string | string[]) => {
     if (!session) return;
@@ -412,14 +446,52 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                             <h4 className="font-semibold text-zinc-800 mb-4">{i + 1}. {q.question}</h4>
                             <div className="flex flex-col gap-2">
                               {q.options.map((opt: string, optIdx: number) => (
-                                <button key={optIdx} className="text-left px-4 py-3 rounded-lg border border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50 transition-colors text-sm text-zinc-700">
+                                <button 
+                                  key={optIdx} 
+                                  onClick={() => !quizSubmitted && setSelectedAnswers(prev => ({ ...prev, [i]: optIdx }))}
+                                  className={cn(
+                                    "text-left px-4 py-3 rounded-lg border transition-colors text-sm text-zinc-700",
+                                    selectedAnswers[i] === optIdx ? "border-rose-300 bg-rose-50" : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50",
+                                    quizSubmitted && optIdx === q.answer_index ? "border-green-300 bg-green-50" : "",
+                                    quizSubmitted && selectedAnswers[i] === optIdx && optIdx !== q.answer_index ? "border-red-300 bg-red-50" : ""
+                                  )}
+                                >
                                   <span className="font-mono text-xs text-zinc-400 mr-3">{String.fromCharCode(65 + optIdx)}</span>
                                   {opt}
                                 </button>
                               ))}
                             </div>
+                            {quizSubmitted && (
+                              <p className="mt-4 text-sm text-zinc-600 italic">{q.explanation}</p>
+                            )}
                           </div>
                         ))}
+                        {Object.keys(selectedAnswers).length === (session.quiz as any).quiz.length && !quizSubmitted && (
+                          <Button onClick={() => {
+                            const quizData = (session.quiz as any).quiz;
+                            let correct = 0;
+                            quizData.forEach((q: any, i: number) => {
+                              if (selectedAnswers[i] === q.answer_index) correct++;
+                            });
+                            setQuizScore(correct);
+                            setQuizSubmitted(true);
+                          }} className="mt-6 bg-rose-600 hover:bg-rose-700 text-white shadow-sm rounded-full px-8 font-medium">
+                            Submit Quiz
+                          </Button>
+                        )}
+                        {quizSubmitted && (
+                          <div className="mt-6 text-center">
+                            <p className="text-xl font-bold text-zinc-900">Score: {quizScore}/{ (session.quiz as any).quiz.length }</p>
+                            <Button onClick={() => {
+                              setSelectedAnswers({});
+                              setQuizSubmitted(false);
+                              setQuizScore(null);
+                              generateContent("quiz");
+                            }} className="mt-4 bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm rounded-full px-8 font-medium">
+                              Try Again
+                            </Button>
+                          </div>
+                        )}
                     </div>
                   ) : (
                     <Button onClick={() => generateContent("quiz")} className="mt-4 bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm rounded-full px-8 font-medium w-max">
@@ -441,13 +513,33 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                   ) : session.quest ? (
                     <div className="w-full max-w-xl mx-auto flex flex-col items-center mt-6">
                         <p className="text-lg text-zinc-700 text-center leading-relaxed mb-10">{(session.quest as any).story}</p>
-                        <div className="flex flex-col gap-3 w-full">
-                          {(session.quest as any).options?.map((opt: string, i: number) => (
-                            <button key={i} className="w-full px-6 py-4 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-xl text-left border border-zinc-800 hover:border-zinc-700 transition-all shadow-sm">
-                              {opt}
-                            </button>
-                          ))}
-                        </div>
+                        {(session.quest as any).win ? (
+                          <div className="text-center">
+                            <p className="text-2xl font-bold text-green-600 mb-4">🎉 You Win!</p>
+                            <Button onClick={() => generateContent("quest")} className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm rounded-full px-8 font-medium">
+                              Play Again
+                            </Button>
+                          </div>
+                        ) : (session.quest as any).lose ? (
+                          <div className="text-center">
+                            <p className="text-2xl font-bold text-red-600 mb-4">💀 You Lose!</p>
+                            <Button onClick={() => generateContent("quest")} className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm rounded-full px-8 font-medium">
+                              Try Again
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-3 w-full">
+                            {(session.quest as any).options?.map((opt: string, i: number) => (
+                              <button 
+                                key={i} 
+                                onClick={() => continueQuest(opt)}
+                                className="w-full px-6 py-4 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-xl text-left border border-zinc-800 hover:border-zinc-700 transition-all shadow-sm"
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                     </div>
                   ) : (
                     <Button onClick={() => generateContent("quest")} className="mt-6 bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm rounded-full px-8 font-medium">
