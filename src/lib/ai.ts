@@ -1,4 +1,5 @@
 import Cerebras from '@cerebras/cerebras_cloud_sdk';
+import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 export type ModeId = "notes" | "flashcards" | "quiz" | "quest" | "visual" | "podcast" | "audio";
 
 interface GenerationResult {
@@ -11,9 +12,76 @@ const VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Rachel
 // COMMENTED OUT APIs (to be uncommented once Cerebras API is working):
 // - Other APIs in .env.local (OpenAI, Replicate, Pinecone, Tavily) are not currently used in code
 
+async function generateAudio(text: string): Promise<string | null> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey || apiKey.startsWith("dummy") || apiKey === "") {
+    console.log("[AI.Audio] ElevenLabs key missing or dummy, skipping audio generation.");
+    // Return silent MP3 to allow frontend to render the player/script
+    return "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVMAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAAA=";
+  }
+
+  try {
+    const client = new ElevenLabsClient({ apiKey });
+    const audioStream = await client.textToSpeech.convert(VOICE_ID, {
+      text: text.slice(0, 5000),
+      model_id: "eleven_multilingual_v2",
+      output_format: "mp3_44100_128",
+    });
+
+    const chunks: Buffer[] = [];
+    for await (const chunk of audioStream) {
+      chunks.push(Buffer.from(chunk));
+    }
+    const content = Buffer.concat(chunks);
+    return `data:audio/mpeg;base64,${content.toString('base64')}`;
+  } catch (error) {
+    console.error("[AI.Audio] Generation failed:", error);
+    // Return silent MP3 on error to prevent frontend breakage
+    return "data:audio/mp3;base64,SUQzBAAAAAAAI1RTSVMAAAAPAAADTGF2ZjU4LjI5LjEwMAAAAAAAAAAAAAAA//OEAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAAEAAABIADAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMD//////////////////////////////////////////////////////////////////wAAAAA=";
+  }
+}
+
+function cleanJsonString(str: string): string {
+  let inString = false;
+  let escaped = false;
+  let result = '';
+
+  for (let i = 0; i < str.length; i++) {
+    const char = str[i];
+
+    if (inString) {
+      if (escaped) {
+        result += char;
+        escaped = false;
+      } else if (char === '\\') {
+        result += char;
+        escaped = true;
+      } else if (char === '"') {
+        result += char;
+        inString = false;
+      } else if (char === '\n') {
+        result += '\\n';
+      } else if (char === '\r') {
+        result += '\\r';
+      } else if (char === '\t') {
+        result += '\\t';
+      } else if (char.charCodeAt(0) < 0x20) {
+        // Skip other control characters
+      } else {
+        result += char;
+      }
+    } else {
+      if (char === '"') {
+        inString = true;
+      }
+      result += char;
+    }
+  }
+  return result;
+}
+
 export async function generateModeContent(mode: ModeId, topic: string, complexity: number, fileContent?: string): Promise<GenerationResult> {
   const cerebrasKey = process.env.CEREBRAS_API_KEY;
-  const elevenlabsKey = process.env.ELEVENLABS_API_KEY;
 
   const isMock = !cerebrasKey || cerebrasKey.startsWith("dummy_") || cerebrasKey === "" || cerebrasKey === "your-cerebras-api-key-here";
 
@@ -33,8 +101,8 @@ export async function generateModeContent(mode: ModeId, topic: string, complexit
     const complexityStr = complexity.toString();
     const systemInstruction = `You are Flux, an expert AI tutor. The user wants to learn about: "${topic}". The requested complexity level is ${complexityStr}/100 (0=ELI5, 100=Post-Graduate).`;
 
-    // Include file content in system instruction if available
-    let fullSystemInstruction = systemInstruction;
+    // Create a context block from file content to prepend to the user prompt
+    let contextBlock = "";
     if (fileContent && fileContent.trim()) {
       // Strip markers if present
       const cleanedContent = fileContent
@@ -45,7 +113,7 @@ export async function generateModeContent(mode: ModeId, topic: string, complexit
         .trim();
 
       if (cleanedContent && cleanedContent.length > 0) {
-        fullSystemInstruction += `\n\n[SOURCE MATERIAL - Primary Reference]\n${cleanedContent}\n[END SOURCE MATERIAL]`;
+        contextBlock = `Use the following source material as your primary reference:\n\n--- SOURCE MATERIAL ---\n${cleanedContent}\n--- END SOURCE MATERIAL ---\n\n`;
         console.log(`[AI.${mode}] Included ${cleanedContent.length} chars of source material in prompt`);
       }
     }
@@ -160,53 +228,43 @@ IMPORTANT: This response must be valid JSON; do not add any freeform text.`;
         break;
 
       case 'visual':
-        userPrompt = `Create a visual graph or diagram representing key relationships and concepts from the source material.
+        isJsonMode = true;
+        userPrompt = `Create a hierarchical mind map representing the key concepts and relationships from the source material.
 
 REQUIREMENTS:
-1. **Structure**: Choose the best visualization type:
-   - 'graph TD' (flowchart) for processes, hierarchies, or decision flows
-   - 'mindmap' for concept relationships and brainstorming
-   - 'graph LR' for left-to-right relationships
-2. **Content**:
-   - Show relationships between key concepts
-   - Include 6-10 nodes representing important ideas
-   - Use descriptive labels that are clear and concise
-3. **Educational Value**: The diagram should help learners understand connections between concepts
+1. **Output Format**: Return valid JSON representing a tree structure.
+2. **Structure**:
+   - Root node: Main topic.
+   - Children: Subtopics, key concepts, or related ideas.
+   - Depth: Ensure at least 2-3 levels of hierarchy to show relationships.
+3. **Content**:
+   - "id": A unique string identifier.
+   - "label": Concise title for the node (max 3-5 words).
+   - "description": A brief explanation or context (1 sentence).
+   - "children": Array of child nodes.
+4. **JSON Schema**:
+   { "root": { "id": "string", "label": "string", "description": "string", "children": [ ... ] } }
 
-You MUST respond with RAW Mermaid.js code ONLY. Do not use markdown code blocks (\`\`\`).
-Start directly with 'graph', 'mindmap', or another Mermaid diagram type. Example: 'graph TD' or 'mindmap'`;
+IMPORTANT: Return ONLY valid JSON. No markdown formatting, no code blocks.`;
         break;
 
       case 'podcast':
-        userPrompt = `Create a podcast script about "${topic}" based on the source material.
+        isJsonMode = true;
+        userPrompt = `You are a podcast host. Create a short, engaging podcast script summarizing the key points from the provided source material about "${topic}".
 
-Write a 1-2 minute podcast script (roughly 150-300 words) that covers the key concepts from the material. The script should be engaging and conversational, like a real podcast episode.
+REQUIREMENTS:
+1. **Style**: Conversational, spoken-word style. Educational but entertaining.
+2. **Length**: 150-200 words (concise).
+3. **Structure**: Intro -> Key Concepts -> Conclusion.
+4. **Formatting**: Return valid JSON ONLY.
+   { "title": "Episode Title", "script": "The spoken content of the podcast..." }
 
-Format:
-**Podcast Script: [Episode Title]**
-
-[Host introduction and main content - write in spoken word style, conversational tone]
-
-[Key takeaways or conclusion]
-
-Make it educational but entertaining, with smooth transitions between topics.`;
+IMPORTANT: The "script" field should ONLY contain the spoken text to be fed into a Text-to-Speech engine. Do not include speaker labels (e.g. "Host:") or sound effects in the script text.`;
         break;
 
       case 'audio':
         // Audio is an alias for podcast
-        userPrompt = `Create a podcast script about "${topic}" based on the source material.
-
-Write a 1-2 minute podcast script (roughly 150-300 words) that covers the key concepts from the material. The script should be engaging and conversational, like a real podcast episode.
-
-Format:
-**Podcast Script: [Episode Title]**
-
-[Host introduction and main content - write in spoken word style, conversational tone]
-
-[Key takeaways or conclusion]
-
-Make it educational but entertaining, with smooth transitions between topics.`;
-        break;
+        return generateModeContent('podcast', topic, complexity, fileContent);
 
       default:
         return { result: null, error: "Invalid mode" };
@@ -214,8 +272,8 @@ Make it educational but entertaining, with smooth transitions between topics.`;
 
     const completion = await cerebras.chat.completions.create({
       messages: [
-        { role: "system", content: fullSystemInstruction },
-        { role: "user", content: userPrompt }
+        { role: "system", content: systemInstruction },
+        { role: "user", content: `${contextBlock}${userPrompt}` }
       ],
       model: 'llama3.1-8b',
       max_completion_tokens: 2048,
@@ -242,13 +300,40 @@ Make it educational but entertaining, with smooth transitions between topics.`;
         cleaned = fenceMatch[2].trim();
       }
 
+      const processParsedJson = async (parsed: any) => {
+        if (parsed && typeof parsed === 'object') {
+          // Post-processing for audio generation
+          if ((mode === 'podcast' || mode === 'audio') && parsed.script) {
+             console.log(`[AI.${mode}] Generating audio for script (${parsed.script.length} chars)...`);
+             const audioUrl = await generateAudio(parsed.script);
+             if (audioUrl) {
+               parsed.audioUrl = audioUrl;
+             }
+          }
+          return { result: parsed };
+        }
+        return null;
+      };
+
       // First attempt: clean parse
       try {
         const parsed = JSON.parse(cleaned);
-        if (parsed && typeof parsed === 'object') {
-          return { result: parsed };
-        }
+        const processed = await processParsedJson(parsed);
+        if (processed) return processed;
       } catch (jsonError) {
+        // Try repairing JSON
+        try {
+          const repaired = cleanJsonString(cleaned);
+          const parsed = JSON.parse(repaired);
+          const processed = await processParsedJson(parsed);
+          if (processed) {
+            console.log(`[AI.${mode}] JSON repaired and parsed successfully`);
+            return processed;
+          }
+        } catch (repairError) {
+          // ignore
+        }
+
         // Second attempt: extract JSON from text (in case of chatty prefix/suffix)
         const firstCurly = cleaned.indexOf('{');
         const lastCurly = cleaned.lastIndexOf('}');
@@ -257,11 +342,21 @@ Make it educational but entertaining, with smooth transitions between topics.`;
            const potentialJson = cleaned.substring(firstCurly, lastCurly + 1);
            try {
               const parsed = JSON.parse(potentialJson);
-              if (parsed && typeof parsed === 'object') {
-                 return { result: parsed };
-              }
+              const processed = await processParsedJson(parsed);
+              if (processed) return processed;
            } catch (e2) {
               console.error(`[AI.${mode}] Extraction parse failed`, e2);
+              
+              // Try repairing extracted JSON
+              try {
+                const repaired = cleanJsonString(potentialJson);
+                const parsed = JSON.parse(repaired);
+                const processed = await processParsedJson(parsed);
+                if (processed) {
+                  console.log(`[AI.${mode}] Extracted JSON repaired and parsed successfully`);
+                  return processed;
+                }
+              } catch (e3) { /* ignore */ }
            }
         }
         
@@ -280,111 +375,5 @@ Make it educational but entertaining, with smooth transitions between topics.`;
     // Return mock content on error
     const mockResult = generateMockContent(mode, topic, fileContent);
     return mockResult;
-  }
-}
-
-function generateDefaultContent(mode: ModeId, topic: string): string | object {
-  // Generate reasonable default content for each mode
-  switch (mode) {
-    case 'flashcards':
-      return { 
-        flashcards: [
-          { front: `What is ${topic}?`, back: "A topic for study and learning." },
-          { front: "Why is this important?", back: "It helps with understanding the subject." }
-        ]
-      };
-    case 'quiz':
-      return { 
-        quiz: [
-          { 
-            question: `Which of these best describes ${topic}?`, 
-            options: ["Option A", "Option B", "Option C", "Option D"], 
-            answer_index: 0, 
-            explanation: "This is the most accurate description." 
-          }
-        ]
-      };
-    case 'quest':
-      return { 
-        story: `You encounter a scenario related to ${topic}...`, 
-        options: ["Choose option A", "Choose option B", "Choose option C"] 
-      };
-    case 'visual':
-      return `graph TD\n  A["${topic}"] --> B["Key Concept 1"]\n  A --> C["Key Concept 2"]\n  B --> D["Application"]\n  C --> D`;
-    case 'podcast':
-      return { script: `Welcome to our podcast about ${topic}. Let's dive into the key aspects...`, audioUrl: null };
-    default:
-      return { content: `Information about ${topic}` };
-  }
-}
-
-async function generateMockContent(mode: ModeId, topic: string, fileContent?: string): Promise<GenerationResult> {
-  // Simulate network delay
-  await new Promise(r => setTimeout(r, 1000));
-
-  const contentSource = fileContent && fileContent.trim() ? `based on uploaded content` : `about ${topic}`;
-
-  switch (mode) {
-    case 'notes':
-      return { result: `### Notes on ${topic}\n\nThis is a highly structured set of notes ${contentSource}. \n\n#### Key Areas\n- **Concept 1**: Foundational principles.\n- **Concept 2**: Advanced applications.\n\n> 💡 Key Insight: Understanding ${topic} requires a holistic view of its components.\n\nSummary: Flux has synthesized this content for your learning journey in mock mode.` };
-    case 'flashcards':
-      return { 
-        flashcards: [
-          { front: `What is the primary goal of ${topic}?`, back: `To provide a comprehensive framework for learning and understanding key concepts related to ${topic}.` },
-          { front: `Who is the target audience for ${topic}?`, back: "Students and lifelong learners using Flux to enhance their knowledge." },
-          { front: `What are the main benefits of studying ${topic}?`, back: "Improved understanding, better problem-solving skills, and practical application of concepts." },
-          { front: `How does ${topic} relate to real-world applications?`, back: `${topic} provides foundational knowledge that can be applied to various real-world scenarios and challenges.` }
-        ]
-      };
-    case 'quiz':
-      return { 
-        quiz: [
-          { 
-            question: `Which of these best describes ${topic}?`, 
-            options: ["A comprehensive framework for learning", "A simple concept with limited applications", "An outdated approach to education", "A purely theoretical subject"],
-            answer_index: 0, 
-            explanation: `${topic} provides a structured approach to understanding complex concepts and their applications.` 
-          },
-          {
-            question: `What is the primary purpose of studying ${topic}?`,
-            options: ["To memorize facts without understanding", "To develop critical thinking and problem-solving skills", "To complete academic requirements only", "To impress others with knowledge"],
-            answer_index: 1,
-            explanation: `${topic} helps build analytical skills and practical understanding beyond mere memorization.`
-          }
-        ]
-      };
-    case 'quest':
-      return { 
-        story: `You arrive at the Temple of ${topic}, a magnificent structure built from knowledge and wisdom. Ancient runes glow on the walls, each representing a key concept from the source material. A wise sage approaches you, their eyes sparkling with the light of understanding.\n\n"You have come seeking knowledge," the sage says. "But knowledge must be earned through choices that test your understanding. Are you ready to begin your journey?"\n\nAs you stand before three glowing portals, each representing a different path of learning, you must choose your approach to mastering ${topic}.`, 
-        options: ["Enter the Portal of Foundations - Focus on building strong basic concepts first", "Enter the Portal of Applications - Learn through real-world examples and practical scenarios", "Enter the Portal of Integration - Connect different concepts to see the bigger picture"] 
-      };
-    case 'visual':
-      return { result: `graph TD\n  A[${topic}] --> B(Phase 1)\n  A --> C(Phase 2)\n  B --> D{Result}\n  C --> D` };
-    case 'podcast':
-      return { result: `**Podcast Script: Exploring ${topic}**
-
-Welcome to the Flux Learning Podcast! Today, we're diving deep into ${topic}, a fascinating subject that combines theory with practical applications.
-
-${topic} represents a comprehensive framework for understanding complex concepts. At its core, ${topic} helps us break down intricate ideas into manageable, learnable components. Whether you're a student, professional, or lifelong learner, mastering ${topic} opens up new possibilities for problem-solving and innovation.
-
-One of the most interesting aspects of ${topic} is how it connects theoretical foundations with real-world applications. For example, the principles of ${topic} can be seen in everything from everyday decision-making to complex system design.
-
-As we continue our learning journey, remember that ${topic} is not just about memorizing facts—it's about developing a deep, intuitive understanding that you can apply in countless situations.
-
-Thanks for joining us on the Flux Learning Podcast. Keep exploring, keep learning!` };
-    case 'audio':
-      return { result: `**Audio Learning Session: ${topic} Fundamentals**
-
-Welcome to your Flux audio learning immersion. Today, we're exploring the fundamentals of ${topic}.
-
-${topic} is a comprehensive field that combines theoretical knowledge with practical applications. Understanding ${topic} helps us make better decisions and solve complex problems in our daily lives and professional work.
-
-The key principles of ${topic} include foundational concepts that build upon each other. By mastering these building blocks, you develop a strong framework for tackling more advanced topics and real-world challenges.
-
-Remember, learning ${topic} is a journey, not a destination. Each concept you master brings you closer to a deeper understanding of how things work and how to apply that knowledge effectively.
-
-Thank you for joining this audio learning session. Continue exploring and building your knowledge base!` };
-    default:
-      return { result: null, error: "Unknown mode" };
   }
 }

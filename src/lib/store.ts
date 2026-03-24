@@ -20,7 +20,7 @@ export interface Session {
   quiz?: any | null;
   quest?: any | null;
   podcast?: any | null;
-  visual?: string | null;
+  visual?: any | null;
 }
 
 interface AppState {

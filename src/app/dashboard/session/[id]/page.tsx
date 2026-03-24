@@ -6,6 +6,7 @@ import { useAppStore, Session } from "@/lib/store";
 import { ModeId } from "@/lib/ai";
 import { ModeSelector } from "@/components/modes/ModeSelector";
 import { NotesDisplay } from "@/components/NotesDisplay";
+import { MindMap } from "@/components/MindMap";
 import { cn } from "@/lib/utils";
 import { Brain, FileText, Zap, Volume2, Gamepad2, Network, Layers, CheckSquare, Loader2, MessageSquare, Folder, FileStack, Plus, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         const data = await res.json();
         
         // Ensure complex modes are parsed from JSON string if needed
-        ['flashcards', 'quiz', 'quest'].forEach(key => {
+        ['flashcards', 'quiz', 'quest', 'visual'].forEach(key => {
           if (data[key] && typeof data[key] === 'string') {
             try {
               const trimmed = data[key].trim();
@@ -154,7 +155,8 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       case 'audio':
         return !!(sessionData.podcast && (typeof sessionData.podcast === 'object' || typeof sessionData.podcast === 'string'));
       case 'visual':
-        return typeof sessionData.visual === 'string' && sessionData.visual.length > 0;
+                return !!(sessionData.visual && (typeof sessionData.visual === 'object' || typeof sessionData.visual === 'string'));
+
       default:
         return false;
     }
@@ -466,8 +468,8 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                   {generating && !session.visual ? (
                     renderGeneratingState("semantic graph mapping")
                   ) : session.visual ? (
-                    <div className="w-full h-full min-h-[400px] mt-6 bg-zinc-50 border border-zinc-200 rounded-2xl p-6 font-mono text-sm text-zinc-600 overflow-auto mix-blend-multiply relative z-10 shadow-inner">
-                        <pre><code>{session.visual.replace(/```mermaid/g, '').replace(/```/g, '')}</code></pre>
+                    <div className="w-full h-full min-h-[400px] mt-6 relative z-10">
+                      <MindMap data={session.visual as any} />
                     </div>
                   ) : (
                     <Button onClick={() => generateContent("visual")} className="mt-4 bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm rounded-full px-8 font-medium relative z-10 w-max">

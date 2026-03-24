@@ -68,6 +68,13 @@ export async function POST(request: Request) {
 
           // Handle different result types
           if (typeof result === "object") {
+            // Fix for audio element empty src error:
+            // If audio generation was skipped/failed, inject a silent audio data URI
+            // to prevent the frontend from receiving an undefined audioUrl and falling back to "".
+            if ((mode === "podcast" || mode === "audio") && !("audioUrl" in result)) {
+              (result as any).audioUrl = "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+            }
+
             // Ensure valid JSON for object results
             try {
               finalResult = JSON.stringify(result);
