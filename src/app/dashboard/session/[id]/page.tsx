@@ -1,42 +1,28 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { useAppStore } from "@/lib/store";
+import { useAppStore, Session } from "@/lib/store";
+import { ModeId } from "@/lib/ai";
 import { ModeSelector } from "@/components/modes/ModeSelector";
 import { NotesDisplay } from "@/components/NotesDisplay";
 import { cn } from "@/lib/utils";
-import { Slider } from "@/components/ui/slider";
-import { Brain, FileText, Download, Share, Zap, Volume2, Gamepad2, Network, Layers, CheckSquare, Loader2, MessageSquare, Folder, FileStack, Plus, ArrowRight } from "lucide-react";
+import { Brain, FileText, Zap, Volume2, Gamepad2, Network, Layers, CheckSquare, Loader2, MessageSquare, Folder, FileStack, Plus, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import ReactMarkdown from "react-markdown";
 
 export default function SessionPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const searchParams = useSearchParams();
   const view = searchParams.get("view");
-  const { activeMode, preferences, setPreferences, setActiveSession } = useAppStore();
+  const { activeMode, preferences, setActiveSession, setActiveMode } = useAppStore();
   
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [tweakPrompt, setTweakPrompt] = useState("");
+  const [failedModes, setFailedModes] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    setActiveSession(resolvedParams.id);
-    fetchSession();
-  }, [resolvedParams.id]);
-
-  useEffect(() => {
-    // Automatically trigger generation for the active mode if it hasn't been generated yet
-    // Or if it contains raw extraction data that needs to be processed
-    const isRaw = session?.notes?.includes("[RAW_EXTRACTION_BEGIN]");
-    if (session && (!session[activeMode] || (activeMode === 'notes' && isRaw)) && !generating && !view) {
-      generateContent(activeMode);
-    }
-  }, [activeMode, session, preferences.complexity, view]);
-
-  const fetchSession = async () => {
+  const fetchSession = useCallback(async () => {
     try {
       const res = await fetch(`/api/sessions/${resolvedParams.id}`);
       if (res.ok) {
@@ -48,37 +34,67 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     } finally {
       setLoading(false);
     }
-  };
+  }, [resolvedParams.id]);
 
-  const generateContent = async (mode: string) => {
+  useEffect(() => {
+    setActiveSession(resolvedParams.id);
+    fetchSession();
+  }, [resolvedParams.id, fetchSession, setActiveSession]);
+
+  useEffect(() => {
+    if (!session || generating) return;
+
+    // If activeMode is not among selected active modes, switch to first selected one
+    if (session.activeModes && session.activeModes.length > 0 && !session.activeModes.includes(activeMode)) {
+      const firstMode = session.activeModes[0];
+      if (typeof firstMode === 'string') {
+        setActiveMode(firstMode as ModeId);
+      }
+    }
+
+    const selectedModes = session.activeModes && session.activeModes.length > 0 ? session.activeModes : ['notes'];
+    const pendingModes = selectedModes.filter((mode: string) => !isModeComplete(mode, session) && !failedModes[mode]);
+
+    if (pendingModes.length > 0 && !view) {
+      generateContent(pendingModes);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeMode, session, preferences.complexity, view, generating, failedModes, setActiveMode]);
+
+  const generateContent = async (modeOrModes: string | string[]) => {
     if (!session) return;
     setGenerating(true);
+
+    const modes = Array.isArray(modeOrModes) ? modeOrModes : [modeOrModes];
+    if (modes.length === 0) {
+      setGenerating(false);
+      return;
+    }
+
     try {
-      const res = await fetch(`/api/generate/${mode}`, {
+      const res = await fetch(`/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           sessionId: session.id,
-          topic: session.title, 
-          complexity: preferences.complexity 
+          modes,
+          topic: session.title,
+          complexity: preferences.complexity,
         }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        const result = data.result;
-        
-        // Update local React state so UI updates
-        setSession((prev: any) => ({ ...prev, [mode]: result }));
-        
-        // Persist to DB securely in SQLite
-        await fetch(`/api/sessions/${session.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ [mode]: result })
-        });
+
+      if (!res.ok) {
+        const err = await res.text();
+        modes.forEach(m => setFailedModes(prev => ({ ...prev, [m]: true })));
+        console.error(`Failed to generate ${modes.join(', ')}:`, err);
+      } else {
+        // refresh everything from db so UI gets latest structures (notes, arrays, objects)
+        await fetchSession();
+        modes.forEach(m => setFailedModes(prev => ({ ...prev, [m]: false })));
       }
     } catch (error) {
-      console.error(`Error generating ${mode}:`, error);
+      console.error(`Error generating ${modes.join(', ')}:`, error);
+      modes.forEach(m => setFailedModes(prev => ({ ...prev, [m]: true })));
     } finally {
       setGenerating(false);
     }
@@ -90,6 +106,27 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       <p className="text-sm font-medium text-zinc-500 animate-pulse">Synthesizing {modeName} via Gemini...</p>
     </div>
   );
+
+  const isModeComplete = (mode: string, sessionData?: Session | null) => {
+    if (!sessionData) return false;
+    switch (mode) {
+      case 'notes':
+        return typeof sessionData.notes === 'string' && sessionData.notes.length > 0;
+      case 'flashcards':
+        return typeof sessionData.flashcards === 'string' && sessionData.flashcards.length > 0;
+      case 'quiz':
+        return typeof sessionData.quiz === 'string' && sessionData.quiz.length > 0;
+      case 'quest':
+        return typeof sessionData.quest === 'string' && sessionData.quest.length > 0;
+      case 'podcast':
+      case 'audio':
+        return typeof sessionData.podcast === 'string' && sessionData.podcast.length > 0;
+      case 'visual':
+        return typeof sessionData.visual === 'string' && sessionData.visual.length > 0;
+      default:
+        return false;
+    }
+  };
 
   const renderFilesView = () => (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 mt-8">
@@ -105,10 +142,10 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {[
-          { icon: FileStack, label: "PDFs", count: session.materials.pdfs, color: "text-indigo-500", bg: "bg-indigo-50" },
-          { icon: Volume2, label: "Audio", count: session.materials.audio, color: "text-violet-500", bg: "bg-violet-50" },
-          { icon: Volume2, label: "Video", count: session.materials.video, color: "text-cyan-500", bg: "bg-cyan-50" },
-          { icon: FileText, label: "Images", count: session.materials.image, color: "text-emerald-500", bg: "bg-emerald-50" },
+          { icon: FileStack, label: "PDFs", count: session?.materials?.pdfs || 0, color: "text-indigo-500", bg: "bg-indigo-50" },
+          { icon: Volume2, label: "Audio", count: session?.materials?.audio || 0, color: "text-violet-500", bg: "bg-violet-50" },
+          { icon: Volume2, label: "Video", count: session?.materials?.video || 0, color: "text-cyan-500", bg: "bg-cyan-50" },
+          { icon: FileText, label: "Images", count: session?.materials?.image || 0, color: "text-emerald-500", bg: "bg-emerald-50" },
         ].map((item, idx) => (
           <div key={idx} className="bg-white border border-zinc-200 rounded-2xl p-6 flex items-center justify-between group hover:border-indigo-200 transition-all shadow-sm">
             <div className="flex items-center gap-4">
@@ -303,7 +340,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                     renderGeneratingState("flashcard deck")
                   ) : session.flashcards ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                        {session.flashcards.flashcards?.map((card: any, idx: number) => (
+                        {session.flashcards?.flashcards?.map((card: { front: string; back: string }, idx: number) => (
                           <div key={idx} className="group relative w-full h-48 [perspective:1000px] cursor-pointer">
                             <div className="absolute inset-0 w-full h-full duration-500 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)] shadow-sm rounded-xl">
                               <div className="absolute inset-0 w-full h-full bg-zinc-50 rounded-xl border border-zinc-200 flex items-center justify-center p-6 text-center shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] [backface-visibility:hidden]">
@@ -336,7 +373,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                     renderGeneratingState("dynamic quiz")
                   ) : session.quiz ? (
                     <div className="mt-6 flex flex-col gap-8 w-full max-w-2xl">
-                        {session.quiz.quiz?.map((q: any, i: number) => (
+                        {session.quiz?.quiz?.map((q: { question: string; options: string[]; answer_index:number; explanation:string }, i: number) => (
                           <div key={i} className="bg-zinc-50 rounded-2xl p-6 border border-zinc-200">
                             <h4 className="font-semibold text-zinc-800 mb-4">{i + 1}. {q.question}</h4>
                             <div className="flex flex-col gap-2">

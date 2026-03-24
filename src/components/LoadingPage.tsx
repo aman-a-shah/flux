@@ -5,6 +5,16 @@ import { useRouter } from "next/navigation";
 import { Loader2, Brain, FileText, Layers, CheckSquare, Volume2, Gamepad2, Network, Check, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+type ModeData = {
+  notes?: string | null;
+  flashcards?: { flashcards?: unknown[] } | unknown[] | null;
+  quiz?: { quiz?: unknown[] } | unknown[] | null;
+  quest?: { story?: string; options?: string[] } | null;
+  podcast?: { script?: string; audioUrl?: string } | string | null;
+  visual?: string | null;
+  [key: string]: unknown;
+};
+
 interface LoadingPageProps {
   sessionId: string;
   selectedModes: string[];
@@ -28,8 +38,7 @@ export default function LoadingPage({ sessionId, selectedModes, topic }: Loading
   const [isComplete, setIsComplete] = useState(false);
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    let checkInterval: NodeJS.Timeout;
+    let checkInterval: NodeJS.Timeout | undefined;
 
     const startGeneration = async () => {
       try {
@@ -52,19 +61,32 @@ export default function LoadingPage({ sessionId, selectedModes, topic }: Loading
             if (statusResponse.ok) {
               const session = await statusResponse.json();
 
+              const isModeComplete = (mode: string, sessionData: ModeData) => {
+                const field = mode === 'podcast' ? sessionData.podcast : sessionData[mode];
+                if (!field) return false;
+
+                switch (mode) {
+                  case 'notes':
+                    return typeof field === 'string' && field.length > 0;
+                  case 'flashcards':
+                    return typeof field === 'string' && field.length > 0;
+                  case 'quiz':
+                    return typeof field === 'string' && field.length > 0;
+                  case 'quest':
+                    return typeof field === 'string' && field.length > 0;
+                  case 'podcast':
+                  case 'audio':
+                    return typeof field === 'string' && field.length > 0;
+                  case 'visual':
+                    return typeof field === 'string' && field.trim().length > 0;
+                  default:
+                    return false;
+                }
+              };
+
               const newlyCompleted: string[] = [];
               selectedModes.forEach(mode => {
-                const dbField = mode === "podcast" ? "podcast" : mode;
-                const fieldContent = session[dbField];
-                
-                // Field is complete if it has actual generated content
-                // For notes: check for [GENERATED_NOTES] marker indicating generation happened
-                // For others: just check if field has content
-                const isComplete = mode === 'notes' 
-                  ? fieldContent && fieldContent.includes('[GENERATED_NOTES]')
-                  : fieldContent && fieldContent.length > 0;
-                
-                if (isComplete && !completedModes.has(mode)) {
+                if (isModeComplete(mode, session) && !completedModes.has(mode)) {
                   newlyCompleted.push(mode);
                 }
               });
@@ -74,14 +96,7 @@ export default function LoadingPage({ sessionId, selectedModes, topic }: Loading
                 setCurrentMode(newlyCompleted[newlyCompleted.length - 1]);
               }
 
-              const completedCount = selectedModes.filter(mode => {
-                const dbField = mode === "podcast" ? "podcast" : mode;
-                const fieldContent = session[dbField];
-                // Count complete if it has generated content
-                return mode === 'notes'
-                  ? fieldContent && fieldContent.includes('[GENERATED_NOTES]')
-                  : fieldContent && fieldContent.length > 0;
-              }).length;
+              const completedCount = selectedModes.filter(mode => isModeComplete(mode, session)).length;
 
               setProgress((completedCount / selectedModes.length) * 100);
 
@@ -107,7 +122,7 @@ export default function LoadingPage({ sessionId, selectedModes, topic }: Loading
     startGeneration();
 
     // Progress animation
-    interval = setInterval(() => {
+    const interval = setInterval(() => {
       setProgress(prev => {
         if (prev >= 90 && !isComplete) return prev;
         return Math.min(prev + Math.random() * 2, 90);
@@ -159,7 +174,7 @@ export default function LoadingPage({ sessionId, selectedModes, topic }: Loading
             </h1>
 
             <p className="text-lg text-zinc-600 mb-2">
-              "{topic}"
+              {topic}
             </p>
 
             <p className="text-sm text-zinc-500">

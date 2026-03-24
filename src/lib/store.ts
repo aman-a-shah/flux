@@ -16,10 +16,10 @@ export interface Session {
   };
   activeModes?: string[];
   notes?: string | null;
-  flashcards?: any[] | null;
-  quiz?: any[] | null;
+  flashcards?: any | null;
+  quiz?: any | null;
   quest?: any | null;
-  podcast?: string | null;
+  podcast?: any | null;
   visual?: string | null;
 }
 
