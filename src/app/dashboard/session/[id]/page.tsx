@@ -205,6 +205,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                     </div>
                   </div>
 
+                {/*}
                   <div className="bg-white rounded-[20px] p-4 mb-8 flex items-center gap-6 border border-zinc-200 shadow-sm relative z-20">
                     <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center shrink-0 border border-indigo-100/50">
                       <Brain className="w-5 h-5 text-indigo-500" />
@@ -231,6 +232,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                       </div>
                     </div>
                   </div>
+                  */}
 
                   {generating || (session.notes && session.notes.includes("[RAW_EXTRACTION_BEGIN]")) ? (
                     renderGeneratingState("notes")
