@@ -68,14 +68,30 @@ export default function LoadingPage({ sessionId, selectedModes, topic }: Loading
                 switch (mode) {
                   case 'notes':
                     return typeof field === 'string' && field.length > 0;
-                  case 'flashcards':
+                  case 'flashcards': {
+                    if (Array.isArray(field)) return field.length > 0;
+                    if (field && typeof field === 'object' && 'flashcards' in field) {
+                      const nested = (field as { flashcards?: unknown }).flashcards;
+                      return Array.isArray(nested) && nested.length > 0;
+                    }
                     return typeof field === 'string' && field.length > 0;
-                  case 'quiz':
+                  }
+                  case 'quiz': {
+                    if (Array.isArray(field)) return field.length > 0;
+                    if (field && typeof field === 'object' && 'quiz' in field) {
+                      const nested = (field as { quiz?: unknown }).quiz;
+                      return Array.isArray(nested) && nested.length > 0;
+                    }
                     return typeof field === 'string' && field.length > 0;
+                  }
                   case 'quest':
-                    return typeof field === 'string' && field.length > 0;
+                    return typeof field === 'object' || (typeof field === 'string' && field.length > 0);
                   case 'podcast':
                   case 'audio':
+                    if (typeof field === 'object') {
+                      const obj = field as { script?: string };
+                      return typeof obj.script === 'string' && obj.script.length > 0;
+                    }
                     return typeof field === 'string' && field.length > 0;
                   case 'visual':
                     return typeof field === 'string' && field.trim().length > 0;
