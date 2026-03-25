@@ -7,6 +7,7 @@ import { ModeId } from "@/lib/ai";
 import { ModeSelector } from "@/components/modes/ModeSelector";
 import { NotesDisplay } from "@/components/NotesDisplay";
 import { MindMap } from "@/components/MindMap";
+import { QuestScene } from "@/components/QuestScene";
 import { cn } from "@/lib/utils";
 import { Brain, FileText, Zap, Volume2, Gamepad2, Network, Layers, CheckSquare, Loader2, MessageSquare, Folder, FileStack, Plus, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,8 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
   const [quizScore, setQuizScore] = useState<number | null>(null);
+  const [questLoading, setQuestLoading] = useState(false);
+  const [clickedButtonIndex, setClickedButtonIndex] = useState<number | null>(null);
 
   const fetchSession = useCallback(async () => {
     try {
@@ -506,12 +509,29 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                   <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center mb-6 border border-amber-100">
                     <Gamepad2 className="w-8 h-8 text-amber-500" />
                   </div>
-                  <h3 className="text-2xl font-bold text-zinc-900 mb-2">Ready to Play?</h3>
+                  <h3 className="text-2xl font-bold text-zinc-900 mb-2">
+                    {session.quest && (session.quest as any).options ? `Quest - Chapter ${(session.quest as any).step || 1}` : 
+                     (session.quest as any)?.win ? "Victory!" : 
+                     (session.quest as any)?.lose ? "Game Over" : 
+                     "Ready to Play?"}
+                  </h3>
                   
                   {generating && !session.quest ? (
                     renderGeneratingState("interactive quest")
                   ) : session.quest ? (
-                    <div className="w-full max-w-xl mx-auto flex flex-col items-center mt-6">
+                    <div className="w-full max-w-4xl mx-auto flex flex-col items-center mt-6">
+                        {/* Quest Scene Image */}
+                        <div className="w-full mb-8">
+                          <QuestScene 
+                            story={(session.quest as any).story || ""}
+                            step={(session.quest as any).step || 1}
+                            options={(session.quest as any).options || []}
+                            win={(session.quest as any).win}
+                            lose={(session.quest as any).lose}
+                            visual={(session.quest as any).visual}
+                          />
+                        </div>
+                        
                         <p className="text-lg text-zinc-700 text-center leading-relaxed mb-10">{(session.quest as any).story}</p>
                         {(session.quest as any).win ? (
                           <div className="text-center">
@@ -527,15 +547,38 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                               Try Again
                             </Button>
                           </div>
+                        ) : questLoading ? (
+                          <div className="flex flex-col items-center gap-4">
+                            <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+                            <p className="text-sm text-zinc-500">Continuing your quest...</p>
+                          </div>
                         ) : (
-                          <div className="flex flex-col gap-3 w-full">
+                          <div className="flex flex-col gap-3 w-full max-w-xl">
                             {(session.quest as any).options?.map((opt: string, i: number) => (
                               <button 
                                 key={i} 
-                                onClick={() => continueQuest(opt)}
-                                className="w-full px-6 py-4 bg-zinc-900 hover:bg-zinc-800 text-white font-medium rounded-xl text-left border border-zinc-800 hover:border-zinc-700 transition-all shadow-sm"
+                                onClick={() => {
+                                  setClickedButtonIndex(i);
+                                  setQuestLoading(true);
+                                  continueQuest(opt).finally(() => {
+                                    setClickedButtonIndex(null);
+                                    setQuestLoading(false);
+                                  });
+                                }}
+                                disabled={questLoading}
+                                className={cn(
+                                  "w-full px-6 py-4 font-medium rounded-xl text-left border transition-all duration-200 shadow-sm relative overflow-hidden",
+                                  "hover:shadow-md hover:scale-[1.02] active:scale-[0.98]",
+                                  clickedButtonIndex === i 
+                                    ? "bg-amber-500 text-white border-amber-400 shadow-lg scale-95 animate-pulse" 
+                                    : "bg-zinc-900 hover:bg-zinc-800 text-white border-zinc-800 hover:border-zinc-700",
+                                  questLoading && "opacity-50 cursor-not-allowed"
+                                )}
                               >
-                                {opt}
+                                <span className="relative z-10">{opt}</span>
+                                {clickedButtonIndex === i && (
+                                  <div className="absolute inset-0 bg-gradient-to-r from-amber-400 to-amber-600 animate-pulse opacity-20" />
+                                )}
                               </button>
                             ))}
                           </div>

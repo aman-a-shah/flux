@@ -41,6 +41,41 @@ async function generateAudio(text: string): Promise<string | null> {
   }
 }
 
+async function generateImage(prompt: string): Promise<string | null> {
+  const apiKey = process.env.REPLICATE_API_TOKEN;
+  if (!apiKey) {
+    console.log("[AI.Image] Replicate key missing, skipping image generation.");
+    return null;
+  }
+
+  try {
+    const response = await fetch("https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Prefer": "wait"
+      },
+      body: JSON.stringify({
+        input: {
+          prompt: `${prompt}, fantasy art style, cinematic lighting, highly detailed, 4k`,
+          aspect_ratio: "16:9",
+          go_fast: true
+        }
+      })
+    });
+
+    const result = await response.json();
+    if (result.output && Array.isArray(result.output) && result.output.length > 0) {
+      return result.output[0];
+    }
+    return null;
+  } catch (error) {
+    console.error("[AI.Image] Generation failed:", error);
+    return null;
+  }
+}
+
 function cleanJsonString(str: string): string {
   let inString = false;
   let escaped = false;
@@ -223,12 +258,14 @@ REQUIREMENTS:
 3. **Game Logic**: 
    - If this is step 3 or later, decide if the player wins (good choices) or loses (bad choices).
    - Include "win": true or "lose": true in the response if the game ends.
+    - Include a "visual": "Description of the scene..." field for image generation.
 4. **Structure**:
    - Present 3 new meaningful choices for the next step, or empty array if game ended.
    - Make choices educationally significant.
 5. **Formatting**:
    - Return valid JSON ONLY:
-     { "story": "...", "options": ["...", "...", "..."], "step": ${continueQuest.step + 1} } or { "story": "...", "options": [], "win": true, "step": ${continueQuest.step + 1} } or { "story": "...", "options": [], "lose": true, "step": ${continueQuest.step + 1} }
+    { "story": "...", "visual": "...", "options": ["...", "...", "..."], "step": ${continueQuest.step + 1} }
+
 
 IMPORTANT: This response must be valid JSON; do not add any freeform text.`;
         } else {
@@ -242,11 +279,13 @@ REQUIREMENTS:
    - Show consequences of choices through the next story segment
 3. **Structure**:
    - Include vivid descriptions, dialogue, or world-building details
+   - Include a "visual": "Description of the scene..." field.
    - Present 3 meaningful choices (not 1, not 5)
    - Make some choices educationally significant (apply the learned concepts)
 4. **Formatting**:
    - Return valid JSON ONLY:
-     { "story": "...", "options": ["...", "...", "..."], "step": 1 }
+    { "story": "...", "visual": "...", "options": ["...", "...", "..."], "step": 1 }
+
 
 IMPORTANT: This response must be valid JSON; do not add any freeform text.`;
         }
@@ -333,6 +372,15 @@ IMPORTANT: The "script" field should ONLY contain the spoken text to be fed into
              const audioUrl = await generateAudio(parsed.script);
              if (audioUrl) {
                parsed.audioUrl = audioUrl;
+             }
+          }
+
+          // Post-processing for Quest Image generation
+          if (mode === 'quest' && parsed.visual) {
+             console.log(`[AI.Quest] Generating image for scene: "${parsed.visual.substring(0, 30)}..."`);
+             const imageUrl = await generateImage(parsed.visual);
+             if (imageUrl) {
+               parsed.imageUrl = imageUrl;
              }
           }
           return { result: parsed };
