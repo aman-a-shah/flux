@@ -26,7 +26,7 @@ export default function DashboardPage() {
       {/* Radial Gradient Overlay */}
       <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(99,102,241,0.06),rgba(255,255,255,0))] pointer-events-none" />
 
-      
+
 
       {/* Floating Cursors with Study Mode Labels */}
       <div className="absolute bottom-1/2 right-235 animate-[bounce_5s_infinite_0.5s] flex items-start gap-1 z-20 pointer-events-none">
@@ -67,7 +67,7 @@ export default function DashboardPage() {
                   deleteAllSessions();
                 }
               }}
-              className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+              className="border-red-200 text-red-300 hover:bg-red-50 hover:border-red-300"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Delete All Sessions

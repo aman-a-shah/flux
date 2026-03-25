@@ -9,7 +9,7 @@ import { NotesDisplay } from "@/components/NotesDisplay";
 import { MindMap } from "@/components/MindMap";
 import { QuestScene } from "@/components/QuestScene";
 import { cn } from "@/lib/utils";
-import { Brain, FileText, Zap, Volume2, Gamepad2, Network, Layers, CheckSquare, Loader2, MessageSquare, Folder, FileStack, Plus, ArrowRight } from "lucide-react";
+import { Brain, FileText, Zap, Volume2, Gamepad2, Network, Layers, CheckSquare, Loader2, MessageSquare, Folder, FileStack, Plus, ArrowRight, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function SessionPage({ params }: { params: Promise<{ id: string }> }) {
@@ -22,6 +22,9 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [tweakPrompt, setTweakPrompt] = useState("");
+  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([
+    { role: 'assistant', content: "Hey there! How can I help you refine this session? I can make the notes more technical, add more real-world examples to the quiz, or simplify specific concepts." }
+  ]);
   const [failedModes, setFailedModes] = useState<Record<string, boolean>>({});
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
@@ -116,7 +119,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     }
   };
 
-  const generateContent = async (modeOrModes: string | string[]) => {
+  const generateContent = async (modeOrModes: string | string[], tweak?: string) => {
     if (!session) return;
     setGenerating(true);
 
@@ -135,6 +138,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           modes,
           topic: session.title,
           complexity: preferences.complexity,
+          tweak: tweak,
         }),
       });
 
@@ -236,6 +240,46 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     return <FileText className="w-5 h-5 text-zinc-500" />;
   };
 
+  const handleApplyTweak = async () => {
+    if (!tweakPrompt.trim() || !session) return;
+    
+    const userMsg = tweakPrompt.trim();
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setTweakPrompt("");
+    
+    // Check if user wants to add "gamify" or "quest" mode
+    const lowerPrompt = userMsg.toLowerCase();
+    let modesToUpdate = [...(session.activeModes || ["notes"])];
+    let needsUpdate = false;
+    
+    if ((lowerPrompt.includes("gamify") || lowerPrompt.includes("game") || lowerPrompt.includes("quest")) && !modesToUpdate.includes("quest")) {
+      modesToUpdate.push("quest");
+      needsUpdate = true;
+    }
+    
+    setGenerating(true);
+    try {
+      // If we added a new mode, update the session in the DB first
+      if (needsUpdate) {
+        await fetch(`/api/sessions/${session.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ activeModes: modesToUpdate.join(',') }),
+        });
+      }
+      
+      // Trigger generation for all active modes with the tweak
+      await generateContent(modesToUpdate, userMsg);
+      
+      setMessages(prev => [...prev, { role: 'assistant', content: "I've updated your study session based on your request. You can see the changes in the refined materials!" }]);
+      await fetchSession(); // Refresh to get the new list of modes and content
+    } catch (err) {
+      console.error("Failed to apply tweak:", err);
+      setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I encountered an error while trying to update your session. Please try again." }]);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const renderFilesView = () => (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 mt-8">
       <div className="flex items-center justify-between mb-8">
@@ -304,16 +348,38 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col justify-end gap-6 h-full min-h-[400px]">
-        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-          <div className="flex items-start gap-3 bg-zinc-50 p-4 rounded-2xl border border-zinc-200">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center border border-indigo-100 shrink-0">
-              <Brain className="w-4 h-4 text-indigo-600" />
+      <div className="flex-1 flex flex-col justify-end gap-6 h-full min-h-[400px] overflow-hidden">
+        <div className="flex-1 overflow-y-auto space-y-4 pr-1 pb-4">
+          {messages.map((msg, idx) => (
+            <div key={idx} className={cn(
+              "flex items-start gap-3 p-4 rounded-2xl border transition-all animate-in fade-in slide-in-from-bottom-2",
+              msg.role === 'user' 
+                ? "bg-indigo-600 text-white border-indigo-500 ml-12 shadow-md" 
+                : "bg-zinc-50 text-zinc-700 border-zinc-200 mr-12 shadow-sm"
+            )}>
+              <div className={cn(
+                "w-8 h-8 rounded-lg flex items-center justify-center border shrink-0",
+                msg.role === 'user' ? "bg-indigo-500 border-indigo-400" : "bg-indigo-50 border-indigo-100"
+              )}>
+                {msg.role === 'user' ? <User className="w-4 h-4 text-white" /> : <Brain className="w-4 h-4 text-indigo-600" />}
+              </div>
+              <div className="text-sm leading-relaxed">
+                {msg.content}
+              </div>
             </div>
-            <div className="text-sm text-zinc-700 leading-relaxed">
-              Hey there! How can I help you refine this session? I can make the notes more technical, add more real-world examples to the quiz, or simplify specific concepts.
+          ))}
+          {generating && (
+            <div className="flex items-start gap-3 bg-zinc-50 p-4 rounded-2xl border border-zinc-200 mr-12 shadow-sm animate-pulse">
+              <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center border border-indigo-100 shrink-0">
+                <Brain className="w-4 h-4 text-indigo-600" />
+              </div>
+              <div className="flex gap-1 items-center h-5">
+                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <div className="relative group shrink-0">
@@ -322,10 +388,16 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
             <input
               value={tweakPrompt}
               onChange={(e) => setTweakPrompt(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleApplyTweak()}
               placeholder="Ask Flux to modify your session..."
               className="flex-1 bg-transparent px-4 py-3 text-sm focus:outline-none placeholder:text-zinc-400"
             />
-            <Button size="icon" className="bg-zinc-900 rounded-xl hover:bg-zinc-800 shrink-0">
+            <Button 
+              onClick={handleApplyTweak}
+              disabled={generating || !tweakPrompt.trim()}
+              size="icon" 
+              className="bg-zinc-900 rounded-xl hover:bg-zinc-800 shrink-0 disabled:opacity-50"
+            >
               <ArrowRight className="w-4 h-4 text-white" />
             </Button>
           </div>

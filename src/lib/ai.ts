@@ -29,7 +29,7 @@ async function generateAudio(text: string): Promise<string | null> {
     });
 
     const chunks: Buffer[] = [];
-    for await (const chunk of audioStream) {
+    for await (const chunk of audioStream as any) {
       chunks.push(Buffer.from(chunk));
     }
     const content = Buffer.concat(chunks);
@@ -115,7 +115,7 @@ function cleanJsonString(str: string): string {
   return result;
 }
 
-export async function generateModeContent(mode: ModeId, topic: string, complexity: number, fileContent?: string, continueQuest?: { choice: string; previousStory: string; step: number }): Promise<GenerationResult> {
+export async function generateModeContent(mode: ModeId, topic: string, complexity: number, fileContent?: string, continueQuest?: { choice: string; previousStory: string; step: number }, tweak?: string): Promise<GenerationResult> {
   const cerebrasKey = process.env.CEREBRAS_API_KEY;
 
   const isMock = !cerebrasKey || cerebrasKey.startsWith("dummy_") || cerebrasKey === "" || cerebrasKey === "your-cerebras-api-key-here";
@@ -134,7 +134,8 @@ export async function generateModeContent(mode: ModeId, topic: string, complexit
     });
 
     const complexityStr = complexity.toString();
-    const systemInstruction = `You are Flux, an expert AI tutor. The user wants to learn about: "${topic}". The requested complexity level is ${complexityStr}/100 (0=ELI5, 100=Post-Graduate).`;
+    const tweakInstruction = tweak ? `\n\nCRITICAL USER REFINEMENT: The user has requested the following specific adjustment to this generation: "${tweak}". You MUST prioritize and apply this adjustment above all other formatting rules.` : "";
+    const systemInstruction = `You are Flux, an expert AI tutor. The user wants to learn about: "${topic}". The requested complexity level is ${complexityStr}/100 (0=ELI5, 100=Post-Graduate).${tweakInstruction}`;
 
     // Create a context block from file content to prepend to the user prompt
     let contextBlock = "";
@@ -367,7 +368,7 @@ IMPORTANT: The "script" field should ONLY contain the spoken text to be fed into
       const processParsedJson = async (parsed: any) => {
         if (parsed && typeof parsed === 'object') {
           // Post-processing for audio generation
-          if ((mode === 'podcast' || mode === 'audio') && parsed.script) {
+          if (((mode as string) === 'podcast' || (mode as string) === 'audio') && parsed.script) {
              console.log(`[AI.${mode}] Generating audio for script (${parsed.script.length} chars)...`);
              const audioUrl = await generateAudio(parsed.script);
              if (audioUrl) {
@@ -535,7 +536,7 @@ Title:`;
       max_tokens: 50
     });
 
-    const raw = response.choices[0]?.message?.content?.trim();
+    const raw = (response as any).choices[0]?.message?.content?.trim();
     if (raw && raw.length > 0) {
       // Clean up the response - remove quotes if present
       const cleaned = raw.replace(/^["']|["']$/g, '').trim();
