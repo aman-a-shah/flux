@@ -37,6 +37,7 @@ model Session {
   podcast     String?   // Base64 audio string or ElevenLabs output
   visual      String?   // Mermaid DSL or JSON for visual graph
   activeModes String?   // Comma separated list of active study modes
+  files       String?   // JSON array of file metadata [{name, type}]
 
   // progress tracking for each mode
   notesProgress       Int      @default(0) // 0-100, based on scroll position

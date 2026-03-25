@@ -143,6 +143,7 @@ export async function POST(request: Request) {
         audioCount: fileCounts.audio,
         videoCount: fileCounts.video,
         imageCount: fileCounts.image,
+        files: JSON.stringify(files.map(f => ({ name: f.name, type: f.type }))),
         activeModes: modesToGenerate.join(','),
         // Store extracted content with clear markers so we can distinguish from generated notes
         notes: notesContent,

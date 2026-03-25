@@ -340,7 +340,7 @@ IMPORTANT: The "script" field should ONLY contain the spoken text to be fed into
         { role: "user", content: `${contextBlock}${userPrompt}` }
       ],
       model: 'llama3.1-8b',
-      max_completion_tokens: 2048,
+      max_completion_tokens: 8192,
       temperature: 0.2,
       top_p: 1,
       stream: false
@@ -521,7 +521,7 @@ export async function generateSessionTitleAI(extractedContent: string): Promise<
 
     const userPrompt = `Based on the following study material, create a concise, descriptive title for this study session:
 
-${extractedContent.substring(0, 2000)}
+${extractedContent.substring(0, 5000)}
 
 Title:`;
 

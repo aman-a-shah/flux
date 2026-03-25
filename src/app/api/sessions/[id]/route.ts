@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parseFile } from "@/lib/fileParser";
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -37,6 +38,7 @@ export async function GET(
       quest: null,
       podcast: null,
       visual: session.visual || null,
+      files: session.files ? JSON.parse(session.files) : [],
     };
 
     // Process notes field - strip internal markers for display
@@ -104,45 +106,90 @@ export async function PATCH(
 ) {
   try {
     const resolvedParams = await params;
-    const body = await req.json();
     
-    // We expect the body to contain the field to update, e.g., { notes: "..." } or { flashcards: [...] }
+    // Check content type to decide how to parse body
+    const contentType = req.headers.get("content-type") || "";
     const updateData: any = {};
     
-    if (body.notes !== undefined) updateData.notes = body.notes;
-    
-    if (body.flashcards !== undefined) {
-      updateData.flashcards = typeof body.flashcards === 'string' 
-        ? body.flashcards 
-        : JSON.stringify(body.flashcards);
-    }
-    
-    if (body.quiz !== undefined) {
-      updateData.quiz = typeof body.quiz === 'string' 
-        ? body.quiz 
-        : JSON.stringify(body.quiz);
-    }
-    
-    if (body.quest !== undefined) {
-      updateData.quest = typeof body.quest === 'string' 
-        ? body.quest 
-        : JSON.stringify(body.quest);
-    }
-    
-    if (body.podcast !== undefined) {
-      if (typeof body.podcast === 'object') {
-        try {
-          updateData.podcast = JSON.stringify(body.podcast);
-        } catch (e) {
-          console.error('Failed to stringify podcast:', e);
-          updateData.podcast = body.podcast; // Fallback to raw if stringification fails
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await req.formData();
+      const files = formData.getAll('files') as File[];
+      
+      if (files.length > 0) {
+        // Fetch existing session to append content
+        const session = await prisma.session.findUnique({
+          where: { id: resolvedParams.id }
+        });
+        
+        if (!session) {
+          return NextResponse.json({ error: "Session not found" }, { status: 404 });
         }
-      } else {
-        updateData.podcast = body.podcast;
+        
+        let extractedContent = '';
+        console.log(`[Sessions PATCH] Processing ${files.length} new files for session ${resolvedParams.id}`);
+        for (const file of files) {
+          try {
+            console.log(`[File Parser] Parsing (PATCH): ${file.name} (${file.type}, ${file.size} bytes)`);
+            const parsed = await parseFile(file);
+            console.log(`[File Parser] ✓ Parsed ${file.name}: Got ${parsed.content.length} chars of content (type: ${parsed.type})`);
+            extractedContent += `\n\n--- ${file.name} (${parsed.type.toUpperCase()}) ---\n${parsed.content}`;
+          } catch (error) {
+            console.error(`[File Parser] ✗ Error processing file ${file.name}:`, error);
+            extractedContent += `\n\n--- ${file.name} (ERROR) ---\n[Error processing file: ${error instanceof Error ? error.message : 'Unknown error'}]`;
+          }
+        }
+        
+        // Update file counts
+        const pdfCount = files.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')).length;
+        const audioCount = files.filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg|flac|wma)$/i.test(f.name)).length;
+        const videoCount = files.filter(f => f.type.startsWith('video/') || /\.(mp4|webm|avi|mkv|mov|flv|wmv)$/i.test(f.name)).length;
+        const imageCount = files.filter(f => f.type.startsWith('image/') || /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name)).length;
+        
+        updateData.pdfCount = { increment: pdfCount };
+        updateData.audioCount = { increment: audioCount };
+        updateData.videoCount = { increment: videoCount };
+        updateData.imageCount = { increment: imageCount };
+        
+        // Update files list
+        const existingFiles = session.files ? JSON.parse(session.files) : [];
+        const newFiles = files.map(f => ({ name: f.name, type: f.type }));
+        updateData.files = JSON.stringify([...existingFiles, ...newFiles]);
+        
+        // Append to notes
+        if (session.notes && session.notes.includes('[END_EXTRACTION_ONLY]')) {
+          updateData.notes = session.notes.replace('[END_EXTRACTION_ONLY]', `${extractedContent}\n[END_EXTRACTION_ONLY]`);
+        } else if (session.notes) {
+          updateData.notes = session.notes + extractedContent;
+        } else {
+          updateData.notes = `[EXTRACTION_ONLY]${extractedContent}\n[END_EXTRACTION_ONLY]`;
+        }
       }
+    } else {
+      const body = await req.json();
+      if (body.notes !== undefined) updateData.notes = body.notes;
+      if (body.flashcards !== undefined) {
+        updateData.flashcards = typeof body.flashcards === 'string' ? body.flashcards : JSON.stringify(body.flashcards);
+      }
+      if (body.quiz !== undefined) {
+        updateData.quiz = typeof body.quiz === 'string' ? body.quiz : JSON.stringify(body.quiz);
+      }
+      if (body.quest !== undefined) {
+        updateData.quest = typeof body.quest === 'string' ? body.quest : JSON.stringify(body.quest);
+      }
+      if (body.podcast !== undefined) {
+        if (typeof body.podcast === 'object') {
+          try {
+            updateData.podcast = JSON.stringify(body.podcast);
+          } catch (e) {
+            console.error('Failed to stringify podcast:', e);
+            updateData.podcast = body.podcast;
+          }
+        } else {
+          updateData.podcast = body.podcast;
+        }
+      }
+      if (body.visual !== undefined) updateData.visual = body.visual;
     }
-    
-    if (body.visual !== undefined) updateData.visual = body.visual;
 
     const updatedSession = await prisma.session.update({
       where: { id: resolvedParams.id },

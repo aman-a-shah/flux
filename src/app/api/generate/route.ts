@@ -23,23 +23,16 @@ export async function POST(request: Request) {
     // Extract content from notes field (marked with [EXTRACTION_ONLY])
     let extractedContent = '';
     console.log(`[Generate] Session ${sessionId}: notes field length = ${session.notes?.length || 0} chars`);
-    if (session.notes) {
-      console.log(`[Generate] Session ${sessionId}: notes field preview = "${session.notes.substring(0, 100)}..."`);
-    } else {
-      console.log(`[Generate] Session ${sessionId}: notes field is NULL`);
-    }
     
-    if (session.notes && session.notes.includes('[EXTRACTION_ONLY]')) {
-      extractedContent = session.notes
-        .replace('[EXTRACTION_ONLY]\n', '')
-        .replace('\n[END_EXTRACTION_ONLY]', '')
-        .replace('[EXTRACTION_ONLY]', '')
-        .replace('[END_EXTRACTION_ONLY]', '')
-        .trim();
-      console.log(`[Generate] ✓ Extracted ${extractedContent.length} chars of content from markers`);
-    } else if (session.notes) {
-      console.log(`[Generate] ⚠ notes field exists but NO EXTRACTION MARKERS found, content: "${session.notes.substring(0, 200)}..."`);
-      extractedContent = session.notes; // Fallback to raw notes
+    if (session.notes) {
+      const markersMatch = session.notes.match(/\[EXTRACTION_ONLY\]([\s\S]*?)\[END_EXTRACTION_ONLY\]/);
+      if (markersMatch) {
+        extractedContent = markersMatch[1].trim();
+        console.log(`[Generate] ✓ Extracted ${extractedContent.length} chars of content from markers`);
+      } else {
+        console.log(`[Generate] ⚠ notes field exists but NO EXTRACTION MARKERS found, using full notes`);
+        extractedContent = session.notes; // Fallback to raw notes
+      }
     } else {
       console.log(`[Generate] ⚠ notes field is empty/null - no extracted content available`);
     }

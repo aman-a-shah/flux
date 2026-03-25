@@ -14,6 +14,7 @@ export interface Session {
     image: number;
   };
   activeModes?: string[];
+  files?: Array<{ name: string; type: string }>;
   notes?: string | null;
   flashcards?: any | null;
   quiz?: any | null;
@@ -117,10 +118,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         lastStudied: "Just now",
         materials: {
           pdfs: files?.filter((f: any) => f.type === 'application/pdf' || f.name?.toLowerCase().endsWith('.pdf')).length || 0,
-          audio: 0,
-          video: 0,
-          image: 0
+          audio: files?.filter((f: any) => f.type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg|flac|wma)$/i.test(f.name)).length || 0,
+          video: files?.filter((f: any) => f.type.startsWith('video/') || /\.(mp4|webm|avi|mkv|mov|flv|wmv)$/i.test(f.name)).length || 0,
+          image: files?.filter((f: any) => f.type.startsWith('image/') || /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name)).length || 0
         },
+        files: files?.map((f: any) => ({ name: f.name, type: f.type })),
         activeModes: activeModes || ["notes"],
         ...newSession
       };

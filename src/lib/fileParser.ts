@@ -153,15 +153,12 @@ function cleanPDFText(rawText: string): string {
   // Step 1: Remove control characters
   text = text.replace(/[\u0000-\u001F\u007F-\u009F]/g, ' ');
 
-  // Step 2: CRITICAL - Remove sequences of 4+ identical characters
+  // Step 2: CRITICAL - Remove sequences of 3+ identical characters
   // This eliminates artifact patterns like "GGGGGGGGG", "FFFFFFFF", "BBBBB", etc.
-  // These are visual elements being incorrectly parsed as text
-  text = text.replace(/([A-Za-z])\1{3,}/g, ' '); // 4+ of same letter -> space
-  text = text.replace(/(\d)\1{3,}/g, ' '); // 4+ of same digit -> space
+  text = text.replace(/([A-Za-z0-9])\1{2,}/g, ' '); 
 
-  // Step 3: Remove sequences of 3 identical characters at word boundaries
-  // (Less aggressive - keeps some patterns but removes obvious artifacts)
-  text = text.replace(/\b([A-Za-z])\1{2,}\b/g, ' ');
+  // Step 3: Remove repeating sequences of 2 characters (e.g. "ABABAB", " . . . ")
+  text = text.replace(/([A-Za-z0-9\s]{2,})\1{3,}/g, ' ');
 
   // Step 4: [REMOVED] Was overly aggressive and deleted spaced-out text
 
