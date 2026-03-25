@@ -17,11 +17,22 @@ async function generateSessionTitle(extractedContent: string, files: File[], use
     'homework', 'assignment', 'assignments', 'exam', 'exams', 'test', 'tests'
   ];
   
-  const isGenericTitle = userTitle && userTitle.trim() && 
+  // Check if title is actually just a filename
+  const isFilename = userTitle && (
+    userTitle.toLowerCase().endsWith('.pdf') || 
+    userTitle.toLowerCase().endsWith('.docx') || 
+    userTitle.toLowerCase().endsWith('.doc') || 
+    userTitle.toLowerCase().endsWith('.txt') ||
+    userTitle.toLowerCase().endsWith('.pptx') ||
+    userTitle.toLowerCase().endsWith('.ppt')
+  );
+
+  const isGenericTitle = (userTitle && userTitle.trim().length <= 2) || 
+    isFilename || (userTitle && userTitle.trim() && 
     genericTitles.some(generic => 
       userTitle.toLowerCase().trim() === generic || 
       userTitle.toLowerCase().trim().includes(generic)
-    );
+    ));
 
   // If user provided a non-generic title, use it
   if (userTitle && userTitle.trim() && !isGenericTitle) {

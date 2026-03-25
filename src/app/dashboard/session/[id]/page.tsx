@@ -280,9 +280,6 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
                   <p className="text-[10px] text-zinc-400 font-mono uppercase tracking-wider">{file.type || 'Document'}</p>
                 </div>
               </div>
-              <Button variant="ghost" size="icon" className="text-zinc-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                <ArrowRight className="w-4 h-4" />
-              </Button>
             </div>
           ))
         ) : (

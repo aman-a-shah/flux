@@ -79,7 +79,7 @@ export default function LandingPage() {
 
     setIsProcessing(true);
     try {
-      const finalTopic = topic.trim() || (attachedFiles.length > 0 ? attachedFiles[0].name : "New Session");
+      const finalTopic = topic.trim();
 
       const response = await addSession(finalTopic, attachedFiles, selectedModes);
       if (response?.id) {
