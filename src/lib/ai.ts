@@ -487,6 +487,72 @@ function generateDefaultContent(mode: ModeId, topic: string): string | object {
   }
 }
 
+export async function generateSessionTitleAI(extractedContent: string): Promise<string> {
+  const cerebrasKey = process.env.CEREBRAS_API_KEY;
+
+  const isMock = !cerebrasKey || cerebrasKey.startsWith("dummy_") || cerebrasKey === "" || cerebrasKey === "your-cerebras-api-key-here";
+
+  try {
+    if (isMock) {
+      // Generate a simple mock title based on content
+      const content = extractedContent.trim();
+      if (content.length > 50) {
+        // Try to extract a meaningful phrase
+        const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 10);
+        if (sentences.length > 0) {
+          const firstSentence = sentences[0].trim();
+          if (firstSentence.length < 60) {
+            return firstSentence;
+          }
+        }
+        // Extract first few words
+        const words = content.split(/\s+/).slice(0, 5);
+        return words.join(' ') + '...';
+      }
+      return "Study Session";
+    }
+
+    console.log(`[AI.Title] Making API call to Cerebras for session title...`);
+    const cerebras = new Cerebras({
+      apiKey: cerebrasKey
+    });
+
+    const systemInstruction = `You are an expert at creating concise, descriptive titles for study sessions. Generate a short, engaging title (3-8 words) that captures the essence of the study material. The title should be descriptive and indicate what the session is about, similar to how ChatGPT names conversations.`;
+
+    const userPrompt = `Based on the following study material, create a concise, descriptive title for this study session:
+
+${extractedContent.substring(0, 2000)}
+
+Title:`;
+
+    const response = await cerebras.chat.completions.create({
+      model: "llama3.1-8b",
+      messages: [
+        { role: "system", content: systemInstruction },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 50
+    });
+
+    const raw = response.choices[0]?.message?.content?.trim();
+    if (raw && raw.length > 0) {
+      // Clean up the response - remove quotes if present
+      const cleaned = raw.replace(/^["']|["']$/g, '').trim();
+      if (cleaned.length > 0 && cleaned.length < 100) {
+        return cleaned;
+      }
+    }
+
+    // Fallback
+    return "Study Session";
+
+  } catch (error: unknown) {
+    console.error(`Title generation error:`, error);
+    return "Study Session";
+  }
+}
+
 async function generateMockContent(mode: ModeId, topic: string, fileContent?: string): Promise<GenerationResult> {
   // Simulate network delay
   await new Promise(r => setTimeout(r, 1000));

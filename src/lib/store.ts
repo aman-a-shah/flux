@@ -7,7 +7,6 @@ export interface Session {
   title: string;
   date: string;
   lastStudied: string;
-  progress: number;
   materials: {
     pdfs: number;
     audio: number;
@@ -36,6 +35,7 @@ interface AppState {
   fetchSessions: () => Promise<void>;
   addSession: (title?: string, files?: any, activeModes?: string[]) => Promise<any>;
   deleteSession: (id: string) => Promise<void>;
+  deleteAllSessions: () => Promise<void>;
   
   activeMode: ModeId;
   setActiveMode: (mode: ModeId) => void;
@@ -92,7 +92,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       // Add actual files to FormData
       if (files && Array.isArray(files)) {
-        files.forEach((file, index) => {
+        files.forEach((file) => {
           formData.append('files', file);
         });
       }
@@ -101,17 +101,38 @@ export const useAppStore = create<AppState>((set, get) => ({
         method: "POST",
         body: formData
       });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Server returned ${res.status}: ${errorText.substring(0, 100)}`);
+      }
+      
       const newSession = await res.json();
       
-      // Add to local state
+      // Add to local state with default values for missing fields to prevent UI crashes
+      const completeSession: Session = {
+        id: newSession.id,
+        title: newSession.title || title || "New Session",
+        date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        lastStudied: "Just now",
+        materials: {
+          pdfs: files?.filter((f: any) => f.type === 'application/pdf' || f.name?.toLowerCase().endsWith('.pdf')).length || 0,
+          audio: 0,
+          video: 0,
+          image: 0
+        },
+        activeModes: activeModes || ["notes"],
+        ...newSession
+      };
+
       set((state) => ({
-        sessions: [newSession, ...state.sessions],
-        activeSessionId: newSession.id
+        sessions: [completeSession, ...state.sessions],
+        activeSessionId: completeSession.id
       }));
       
-      return newSession;
+      return completeSession;
     } catch (e) {
-      console.error("Failed to add session", e);
+      console.error("Failed to add session:", e);
       throw e;
     }
   },
@@ -129,6 +150,19 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     } catch (e) {
       console.error("Failed to delete session", e);
+    }
+  },
+  
+  deleteAllSessions: async () => {
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        set({ sessions: [], activeSessionId: null });
+      }
+    } catch (e) {
+      console.error("Failed to delete all sessions", e);
     }
   },
 

@@ -1,15 +1,16 @@
 "use client";
 
 import { useAppStore } from "@/lib/store";
-import { Plus, Sparkles, Brain, Zap, Volume2, Gamepad2, Network, Layers, CheckSquare } from "lucide-react";
+import { Plus, Sparkles, Brain, Zap, Volume2, Gamepad2, Network, Layers, CheckSquare, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { SessionCard } from "@/components/session/SessionCard";
+import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
-  const { sessions } = useAppStore();
+  const { sessions, deleteAllSessions } = useAppStore();
 
   return (
-    <div className="h-screen w-full bg-white overflow-hidden relative z-0">
+    <div className="h-screen w-full bg-white overflow-auto relative z-0">
       {/* Circle Grid Background */}
       <div className="absolute inset-0 z-0 pointer-events-none">
         <svg className="w-full h-full opacity-40" xmlns="http://www.w3.org/2000/svg">
@@ -25,13 +26,7 @@ export default function DashboardPage() {
       {/* Radial Gradient Overlay */}
       <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(99,102,241,0.06),rgba(255,255,255,0))] pointer-events-none" />
 
-      {/* Floating Status Elements */}
-      <div className="absolute top-8 right-8 z-20 pointer-events-none">
-        <div className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-xs font-mono text-indigo-600 shadow-sm animate-in fade-in slide-in-from-right-4 duration-500 delay-200">
-          <Sparkles className="w-3 h-3 text-indigo-500" />
-          <span>{sessions.length} Sessions Ready</span>
-        </div>
-      </div>
+      
 
       {/* Floating Cursors with Study Mode Labels */}
       <div className="absolute bottom-1/2 right-235 animate-[bounce_5s_infinite_0.5s] flex items-start gap-1 z-20 pointer-events-none">
@@ -59,9 +54,25 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <div className="relative z-10 p-8 max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 mb-2">Welcome back, Scholar</h1>
-          <p className="text-zinc-500 font-mono text-sm">You have {sessions.length} active study sessions. Keep the momentum going.</p>
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-zinc-900 mb-2">Welcome back, Scholar</h1>
+            <p className="text-zinc-500 font-mono text-sm">You have {sessions.length} active study sessions. Keep the momentum going.</p>
+          </div>
+          {sessions.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (confirm(`Are you sure you want to delete all ${sessions.length} sessions? This action cannot be undone.`)) {
+                  deleteAllSessions();
+                }
+              }}
+              className="border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete All Sessions
+            </Button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

@@ -24,13 +24,6 @@ export function Header() {
               </div>
             </div>
 
-            <div className="w-32 hidden md:block ml-4">
-              <div className="flex justify-between text-[10px] text-zinc-500 mb-1.5 font-mono">
-                <span>Progress</span>
-                <span className="text-indigo-600 font-semibold">{session.progress}%</span>
-              </div>
-              <Progress value={session.progress} className="h-1.5 bg-zinc-100" indicatorColor="bg-indigo-500 shadow-sm" />
-            </div>
           </div>
         ) : (
           <div className="text-sm font-medium text-zinc-500">No active session</div>

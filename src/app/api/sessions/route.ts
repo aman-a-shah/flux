@@ -2,9 +2,40 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { mockSessions } from "@/lib/mockData";
 import { parseFile } from "@/lib/fileParser";
+import { generateSessionTitleAI } from "@/lib/ai";
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+async function generateSessionTitle(extractedContent: string, files: File[], userTitle?: string): Promise<string> {
+  // Check if user title is generic/unhelpful
+  const genericTitles = [
+    'notes', 'note', 'study', 'studying', 'learn', 'learning', 'quiz', 'quizzes', 
+    'flashcards', 'flashcard', 'podcast', 'podcasts', 'quest', 'quests', 'game', 'games',
+    'visual', 'graph', 'graphs', 'mindmap', 'mind map', 'session', 'sessions',
+    'new session', 'new', 'test', 'testing', 'review', 'reviews', 'practice',
+    'homework', 'assignment', 'assignments', 'exam', 'exams', 'test', 'tests'
+  ];
+  
+  const isGenericTitle = userTitle && userTitle.trim() && 
+    genericTitles.some(generic => 
+      userTitle.toLowerCase().trim() === generic || 
+      userTitle.toLowerCase().trim().includes(generic)
+    );
+
+  // If user provided a non-generic title, use it
+  if (userTitle && userTitle.trim() && !isGenericTitle) {
+    return userTitle.trim();
+  }
+
+  // Use AI to generate a descriptive title based on content
+  if (extractedContent.trim().length > 50) {
+    return await generateSessionTitleAI(extractedContent);
+  }
+  
+  // Fallback
+  return "Study Session";
+}
 
 export async function GET() {
   try {
@@ -21,7 +52,6 @@ export async function GET() {
             title: ms.title,
             date: ms.date,
             lastStudied: ms.lastStudied,
-            progress: ms.progress,
             pdfCount: ms.materials.pdfs,
             audioCount: ms.materials.audio,
             videoCount: ms.materials.video,
@@ -40,14 +70,13 @@ export async function GET() {
       title: s.title,
       date: s.date,
       lastStudied: s.lastStudied,
-      progress: s.progress,
       materials: {
-        pdfs: s.pdfCount,
-        audio: s.audioCount,
-        video: s.videoCount,
-        image: s.imageCount,
+        pdfs: s.pdfCount || 0,
+        audio: s.audioCount || 0,
+        video: s.videoCount || 0,
+        image: s.imageCount || 0,
       },
-      activeModes: s.activeModes?.split(',') || [],
+      activeModes: s.activeModes?.split(',').filter(Boolean) || [],
       createdAt: s.createdAt,
     }));
 
@@ -96,8 +125,7 @@ export async function POST(request: Request) {
       image: files.filter(f => f.type.startsWith('image/') || /\.(png|jpg|jpeg|gif|webp)$/i.test(f.name)).length
     };
 
-    const finalTopic = title || (files.length > 0 ? files[0].name : "New Session");
-
+    const finalTopic = await generateSessionTitle(extractedContent, files, title);
     console.log(`[Sessions POST] Total extracted content: ${extractedContent.length} chars`);
     console.log(`[Sessions POST] Files processed: PDFs=${fileCounts.pdfs}, Audio=${fileCounts.audio}, Video=${fileCounts.video}, Images=${fileCounts.image}`);
     
@@ -111,7 +139,6 @@ export async function POST(request: Request) {
         title: finalTopic,
         date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
         lastStudied: "Just now",
-        progress: 0,
         pdfCount: fileCounts.pdfs,
         audioCount: fileCounts.audio,
         videoCount: fileCounts.video,
@@ -136,5 +163,15 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Error creating session:", error);
     return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
+  }
+}
+
+export async function DELETE() {
+  try {
+    await prisma.session.deleteMany({});
+    return NextResponse.json({ message: "All sessions deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting all sessions:", error);
+    return NextResponse.json({ error: "Failed to delete all sessions" }, { status: 500 });
   }
 }

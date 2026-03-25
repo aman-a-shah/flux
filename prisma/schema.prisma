@@ -38,6 +38,15 @@ model Session {
   visual      String?   // Mermaid DSL or JSON for visual graph
   activeModes String?   // Comma separated list of active study modes
 
+  // progress tracking for each mode
+  notesProgress       Int      @default(0) // 0-100, based on scroll position
+  flashcardsProgress  Int      @default(0) // 0-100, based on cards viewed
+  quizProgress        Int      @default(0) // 0-100, based on correct answers
+  questProgress       Int      @default(0) // 0-100, based on quest completion
+  podcastProgress     Int      @default(0) // 0-100, based on audio playback
+  visualProgress      Int      @default(0) // 0-100, based on interactions
+  audioProgress       Int      @default(0) // 0-100, based on audio playback
+
   userId      String?
   user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 

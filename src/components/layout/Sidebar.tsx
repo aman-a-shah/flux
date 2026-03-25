@@ -117,7 +117,7 @@ export function Sidebar() {
           </Button>
         </div>
 
-        <ScrollArea className="flex-1 w-[240px] shrink-0">
+        <ScrollArea className="flex-1 w-[240px] shrink-0 h-[calc(100vh-4rem)]">
           <div className="p-3 space-y-1">
             {sessions.map((session) => (
               <Link
@@ -133,8 +133,6 @@ export function Sidebar() {
                 <div className="text-sm font-medium line-clamp-1">{session.title}</div>
                 <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-mono">
                   <span>{session.date}</span>
-                  <span className="w-1 h-1 rounded-full bg-zinc-300" />
-                  <span>{session.progress}% mastery</span>
                 </div>
               </Link>
             ))}

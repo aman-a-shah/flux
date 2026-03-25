@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { Play, Sparkles, FolderDown, ArrowRight, FileText, Mic, Video, Image as ImageIcon, Trash2 } from "lucide-react";
-import { Progress } from "@/components/ui/progress";
+import { Play, FolderDown, ArrowRight, FileText, Mic, Video, Image as ImageIcon, Trash2 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useAppStore } from "@/lib/store";
 
@@ -10,7 +9,6 @@ interface SessionCardProps {
     title: string;
     date: string;
     lastStudied: string;
-    progress: number;
     materials?: {
       pdfs: number;
       audio: number;
@@ -37,11 +35,7 @@ export function SessionCard({ session }: SessionCardProps) {
           </div>
           <div className="flex gap-2 items-center">
             <div className="w-10 h-10 rounded-full bg-zinc-50 flex items-center justify-center border border-zinc-200 group-hover:border-indigo-200 group-hover:bg-indigo-50 transition-colors shadow-sm">
-              {session.progress >= 100 ? (
-                <Sparkles className="w-5 h-5 text-emerald-500" />
-              ) : (
-                <Play className="w-4 h-4 text-indigo-500 ml-0.5" />
-              )}
+              <Play className="w-4 h-4 text-indigo-500 ml-0.5" />
             </div>
             <Button
               variant="ghost"
@@ -84,17 +78,11 @@ export function SessionCard({ session }: SessionCardProps) {
         </div>
 
         <div className="mt-auto">
-          <div className="flex justify-between items-end mb-2">
+          <div className="flex justify-between items-end mb-6">
             <div className="text-[11px] font-mono text-zinc-500">
               Last active: {session.lastStudied}
             </div>
-            <div className="text-xs font-semibold text-indigo-600">{session.progress}%</div>
           </div>
-          <Progress 
-            value={session.progress} 
-            className="h-1.5 bg-zinc-100 mb-6" 
-            indicatorColor="bg-indigo-500 shadow-sm"
-          />
 
           <div className="flex gap-2">
             <Link href={`/dashboard/session/${session.id}`} className={buttonVariants({ variant: "default", className: "flex-1 bg-zinc-900 text-white hover:bg-zinc-800 font-medium shadow-sm" })}>

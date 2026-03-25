@@ -58,73 +58,78 @@ export default function LoadingPage({ sessionId, selectedModes, topic }: Loading
         checkInterval = setInterval(async () => {
           try {
             const statusResponse = await fetch(`/api/sessions/${sessionId}`);
-            if (statusResponse.ok) {
-              const session = await statusResponse.json();
+              if (statusResponse.ok) {
+                const contentType = statusResponse.headers.get("content-type");
+                if (contentType && contentType.includes("application/json")) {
+                  const session = await statusResponse.json();
 
-              const isModeComplete = (mode: string, sessionData: ModeData) => {
-                const field = mode === 'podcast' ? sessionData.podcast : sessionData[mode];
-                if (!field) return false;
+                  const isModeComplete = (mode: string, sessionData: ModeData) => {
+                    const field = mode === 'podcast' ? sessionData.podcast : sessionData[mode];
+                    if (!field) return false;
 
-                switch (mode) {
-                  case 'notes':
-                    return typeof field === 'string' && field.length > 0;
-                  case 'flashcards': {
-                    if (Array.isArray(field)) return field.length > 0;
-                    if (field && typeof field === 'object' && 'flashcards' in field) {
-                      const nested = (field as { flashcards?: unknown }).flashcards;
-                      return Array.isArray(nested) && nested.length > 0;
+                    switch (mode) {
+                      case 'notes':
+                        return typeof field === 'string' && field.length > 0;
+                      case 'flashcards': {
+                        if (Array.isArray(field)) return field.length > 0;
+                        if (field && typeof field === 'object' && 'flashcards' in field) {
+                          const nested = (field as { flashcards?: unknown }).flashcards;
+                          return Array.isArray(nested) && nested.length > 0;
+                        }
+                        return typeof field === 'string' && field.length > 0;
+                      }
+                      case 'quiz': {
+                        if (Array.isArray(field)) return field.length > 0;
+                        if (field && typeof field === 'object' && 'quiz' in field) {
+                          const nested = (field as { quiz?: unknown }).quiz;
+                          return Array.isArray(nested) && nested.length > 0;
+                        }
+                        return typeof field === 'string' && field.length > 0;
+                      }
+                      case 'quest':
+                        return typeof field === 'object' || (typeof field === 'string' && field.length > 0);
+                      case 'podcast':
+                      case 'audio':
+                        if (typeof field === 'object') {
+                          const obj = field as { script?: string };
+                          return typeof obj.script === 'string' && obj.script.length > 0;
+                        }
+                        return typeof field === 'string' && field.length > 0;
+                      case 'visual':
+                        return typeof field === 'string' && field.trim().length > 0;
+                      default:
+                        return false;
                     }
-                    return typeof field === 'string' && field.length > 0;
+                  };
+
+                  const newlyCompleted: string[] = [];
+                  selectedModes.forEach(mode => {
+                    if (isModeComplete(mode, session) && !completedModes.has(mode)) {
+                      newlyCompleted.push(mode);
+                    }
+                  });
+
+                  if (newlyCompleted.length > 0) {
+                    setCompletedModes(prev => new Set([...prev, ...newlyCompleted]));
+                    setCurrentMode(newlyCompleted[newlyCompleted.length - 1]);
                   }
-                  case 'quiz': {
-                    if (Array.isArray(field)) return field.length > 0;
-                    if (field && typeof field === 'object' && 'quiz' in field) {
-                      const nested = (field as { quiz?: unknown }).quiz;
-                      return Array.isArray(nested) && nested.length > 0;
-                    }
-                    return typeof field === 'string' && field.length > 0;
+
+                  const completedCount = selectedModes.filter(mode => isModeComplete(mode, session)).length;
+
+                  setProgress((completedCount / selectedModes.length) * 100);
+
+                  if (completedCount === selectedModes.length) {
+                    setIsComplete(true);
+                    clearInterval(checkInterval);
+                    // Redirect after a short delay to show completion
+                    setTimeout(() => {
+                      router.push(`/dashboard/session/${sessionId}`);
+                    }, 1500);
                   }
-                  case 'quest':
-                    return typeof field === 'object' || (typeof field === 'string' && field.length > 0);
-                  case 'podcast':
-                  case 'audio':
-                    if (typeof field === 'object') {
-                      const obj = field as { script?: string };
-                      return typeof obj.script === 'string' && obj.script.length > 0;
-                    }
-                    return typeof field === 'string' && field.length > 0;
-                  case 'visual':
-                    return typeof field === 'string' && field.trim().length > 0;
-                  default:
-                    return false;
+                } else {
+                  console.warn('Status response was not JSON:', await statusResponse.text());
                 }
-              };
-
-              const newlyCompleted: string[] = [];
-              selectedModes.forEach(mode => {
-                if (isModeComplete(mode, session) && !completedModes.has(mode)) {
-                  newlyCompleted.push(mode);
-                }
-              });
-
-              if (newlyCompleted.length > 0) {
-                setCompletedModes(prev => new Set([...prev, ...newlyCompleted]));
-                setCurrentMode(newlyCompleted[newlyCompleted.length - 1]);
               }
-
-              const completedCount = selectedModes.filter(mode => isModeComplete(mode, session)).length;
-
-              setProgress((completedCount / selectedModes.length) * 100);
-
-              if (completedCount === selectedModes.length) {
-                setIsComplete(true);
-                clearInterval(checkInterval);
-                // Redirect after a short delay to show completion
-                setTimeout(() => {
-                  router.push(`/dashboard/session/${sessionId}`);
-                }, 1500);
-              }
-            }
           } catch (error) {
             console.error('Error checking status:', error);
           }

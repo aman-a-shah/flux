@@ -1,19 +1,32 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { AlertCircle, Lightbulb, Code2, BookOpen } from "lucide-react";
+import { useAppStore } from "@/lib/store";
 
-export function NotesDisplay({ content }: { content: string }) {
+interface NotesDisplayProps {
+  content: string;
+  sessionId: string;
+}
+
+export function NotesDisplay({ content, sessionId }: NotesDisplayProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const cleanedContent = useMemo(() => {
     if (!content) return '';
     return content
       .split('\n')
       .filter((line) => {
-        const separatorLine = /^\s*([\-_~=*\u2013\u2014\u2500\u2501]+\s*)+$/; // dash/underscore/tilde/stars/box-drawing
-        return !separatorLine.test(line);
+        // Check if line is just separators (dashes, underscores, etc.)
+        const trimmed = line.trim();
+        if (trimmed.length === 0) return true; // Keep empty lines
+        
+        // Simple check for separator lines - at least 3 of the same character
+        const separatorPattern = /^[-_=~*]{3,}$/;
+        return !separatorPattern.test(trimmed);
       })
       .join('\n')
       .replace(/^[\s\t\n]+|[\s\t\n]+$/g, '');
@@ -190,7 +203,7 @@ export function NotesDisplay({ content }: { content: string }) {
         }
       `}</style>
 
-      <div className="notes-content bg-gradient-to-br from-white via-white to-indigo-50/30 rounded-[24px] border border-zinc-200 p-8 shadow-sm">
+      <div ref={containerRef} className="notes-content bg-gradient-to-br from-white via-white to-indigo-50/30 rounded-[24px] border border-zinc-200 p-8 shadow-sm overflow-y-auto max-h-[70vh]">
         <ReactMarkdown
           components={{
             h1: ({ node, ...props }) => (

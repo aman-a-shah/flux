@@ -24,14 +24,13 @@ export async function GET(
       title: session.title,
       date: session.date,
       lastStudied: session.lastStudied,
-      progress: session.progress,
       materials: {
-        pdfs: session.pdfCount,
-        audio: session.audioCount,
-        video: session.videoCount,
-        image: session.imageCount,
+        pdfs: session.pdfCount || 0,
+        audio: session.audioCount || 0,
+        video: session.videoCount || 0,
+        image: session.imageCount || 0,
       },
-      activeModes: session.activeModes ? session.activeModes.split(',') : [],
+      activeModes: session.activeModes ? session.activeModes.split(',').filter(Boolean) : [],
       notes: null,
       flashcards: null,
       quiz: null,
@@ -144,7 +143,6 @@ export async function PATCH(
     }
     
     if (body.visual !== undefined) updateData.visual = body.visual;
-    if (body.progress !== undefined) updateData.progress = body.progress;
 
     const updatedSession = await prisma.session.update({
       where: { id: resolvedParams.id },
