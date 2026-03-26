@@ -17,10 +17,6 @@
 ### Study Modes
 ![Smart notes output](docs/screenshots/smart-notes.png)
 ![Flash cards interface](docs/screenshots/flash-cards.png)
-
-### Quest Gameplay
-![Interactive quest with choices](docs/screenshots/quest-gameplay.png)
-
 ---
 
 ## 🚀 Project Overview
