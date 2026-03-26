@@ -11,12 +11,12 @@
 
 ### Session Dashboard
 ![Session dashboard showing study history](docs/screenshots/dashboard-home.png)
-(docs/screenshots/file upload.png)
-(docs/screenshots/re-prompt.png)
+![File upload interface](docs/screenshots/file-upload.png)
+![Re-prompt functionality](docs/screenshots/re-prompt.png)
 
 ### Study Modes
-![Notes, flashcards, and quiz outputs](docs/screenshots/smart notes.png)
-(docs/screenshots/flash cards.png)
+![Smart notes output](docs/screenshots/smart-notes.png)
+![Flash cards interface](docs/screenshots/flash-cards.png)
 
 ### Quest Gameplay
 ![Interactive quest with choices](docs/screenshots/quest-gameplay.png)
